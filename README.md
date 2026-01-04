@@ -10,7 +10,21 @@ Prosta aplikacja do zarządzania magazynem, zakupami i sprzedażą z interfejsem
 - Raporty w CSV i Excel
 - Kursy EUR z NBP
 
+## Wymagania
+- PySide6
+- requests
+- openpyxl
+
 ## Instalacja
+Linux/Mac
+## Nadaj uprawnienia do skryptów
+chmod +x install.sh run.sh
+
+## Instalacja
+./install.sh
+
+## Uruchomienie
+./run.sh
 
 ### Windows
 1. Zainstaluj Pythona 3.8+ z [python.org](https://python.org)
