@@ -17,13 +17,13 @@ Prosta aplikacja do zarządzania magazynem, zakupami i sprzedażą z interfejsem
 
 ## Instalacja
 Linux/Mac
-## Nadaj uprawnienia do skryptów
+### Nadaj uprawnienia do skryptów
 chmod +x install.sh run.sh
 
-## Instalacja
+### Instalacja
 ./install.sh
 
-## Uruchomienie
+### Uruchomienie
 ./run.sh
 
 ### Windows
