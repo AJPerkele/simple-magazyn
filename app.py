@@ -10,6 +10,13 @@ from currency import get_eur_rate
 
 PLATFORMS = ["Vinted", "OLX", "Allegro Lokalnie", "Inne"]
 
+try:
+    import config
+    if hasattr(config, "PLATFORMS"):
+        PLATFORMS = config.PLATFORMS
+except ImportError:
+    pass
+
 # ================== STYL ==================
 RED_WHITE_QSS = """
 QWidget {
