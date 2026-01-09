@@ -492,10 +492,10 @@ class DB:
             rows = self.conn.execute("""
                 SELECT
                     o.id,
-                    o.platform,  # <-- To pobiera właściwą nazwę platformy z bazy
+                    o.platform,
                     o.total_pln,
                     o.total_eur,
-                    o.purchase_cost,
+                    COALESCE(o.purchase_cost, 0) as purchase_cost,
                     o.date,
                     GROUP_CONCAT(pr.sku || ' x' || si.qty, ', ') as items
                 FROM sales_orders o
@@ -511,7 +511,7 @@ class DB:
                     o.platform,
                     o.total_pln,
                     o.total_eur,
-                    0 as purchase_cost,
+                    COALESCE(o.purchase_cost, 0) as purchase_cost,
                     o.date,
                     GROUP_CONCAT(pr.sku || ' x' || si.qty, ', ') as items
                 FROM sales_orders o
@@ -523,13 +523,14 @@ class DB:
         
         result = []
         for r in rows:
-            profit = r["total_pln"] - (r["purchase_cost"] or 0)
+            purchase_cost = r["purchase_cost"] if r["purchase_cost"] is not None else 0
+            profit = r["total_pln"] - purchase_cost
             result.append((
                 r["id"],
                 r["platform"],
                 round(r["total_pln"], 2),
                 round(r["total_eur"], 2),
-                round(r["purchase_cost"] or 0, 2),
+                round(purchase_cost, 2),
                 round(profit, 2),
                 r["date"],
                 r["items"] or ""
@@ -1037,10 +1038,11 @@ class DB:
                                "PRZYCHÓD NARASTAJĄCO", "KOSZT NARASTAJĄCO", "ZYSK NARASTAJĄCO"])
                     
                     for transaction in register_data["transakcje"]:
+                        product_display = f"{transaction['nazwa_produktu']} ({transaction['kod_produktu']})"
                         w.writerow([
                             transaction['data_sprzedazy'],
                             transaction['platforma'],
-                            f"{transaction['kod_produktu']} - {transaction['nazwa_produktu']}",
+                            product_display,
                             transaction['ilosc'],
                             f"{transaction['cena_jednostkowa_pln']:.2f}",
                             f"{transaction['wartosc_sprzedazy_pln']:.2f}",
@@ -1242,7 +1244,8 @@ class DB:
                 for transaction in register_data["transakcje"]:
                     ws_details.cell(row=row_detail, column=1, value=transaction['data_sprzedazy'])
                     ws_details.cell(row=row_detail, column=2, value=transaction['platforma'])
-                    ws_details.cell(row=row_detail, column=3, value=f"{transaction['kod_produktu']} - {transaction['nazwa_produktu']}")
+                    product_display = f"{transaction['nazwa_produktu']} ({transaction['kod_produktu']})"
+                    ws_details.cell(row=row_detail, column=3, value=product_display)
                     ws_details.cell(row=row_detail, column=4, value=transaction['ilosc'])
                     ws_details.cell(row=row_detail, column=5, value=transaction['cena_jednostkowa_pln']).number_format = money_format
                     ws_details.cell(row=row_detail, column=6, value=transaction['wartosc_sprzedazy_pln']).number_format = money_format

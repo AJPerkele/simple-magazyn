@@ -1619,7 +1619,7 @@ class ReportDialog(QDialog):
                 # Dodatkowa informacja dla raportów kwartalnych
                 if is_quarterly_report and self.config.use_quarterly_limits():
                     info_text = Paragraph(
-                        f"<b>UWAGA:</b> Od 2026 roku obowiązują limity kwartalne dla działalności nierejestrowanej.<br/>"
+                        f"<b>UWAGA:</b> Od 2026 roku obowiązują limits kwartalne dla działalności nierejestrowanej.<br/>"
                         f"Limit kwartalny wynosi {limit_multiplier*100:.0f}% minimalnego wynagrodzenia.<br/>"
                         f"Przychód w tym kwartale: <b>{total_revenue:.2f} PLN</b>",
                         ParagraphStyle('Info', parent=styles['Normal'], fontName=font_name, fontSize=9,
@@ -1661,7 +1661,7 @@ class ReportDialog(QDialog):
                     story.append(Spacer(1, 30))
                 
                 # Jeśli włączone szczegółowe transakcje
-                if self.cb_sales.isChecked() and len(register_data["transakcje"]) > 0:
+                if include_sales and len(register_data["transakcje"]) > 0:
                     story.append(PageBreak())
                     story.append(Paragraph("SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI", subtitle_style))
                     
@@ -1673,26 +1673,44 @@ class ReportDialog(QDialog):
                     trans_data = [trans_headers]
                     
                     for transaction in transactions:
+                        # Skracamy nazwę produktu, aby zmieściła się w komórce
+                        product_name = transaction['nazwa_produktu']
+                        
+                        # Skracamy nazwę do 35 znaków jeśli jest za długa
+                        if len(product_name) > 35:
+                            product_display = f"{product_name[:32]}..."
+                        else:
+                            product_display = product_name
+                        
+                        # Platforma też może być długa - skracamy do 15 znaków
+                        platform = transaction['platforma']
+                        if len(platform) > 15:
+                            platform = f"{platform[:12]}..."
+                        
                         trans_data.append([
                             transaction['data_sprzedazy'],
-                            transaction['platforma'],
-                            f"{transaction['kod_produktu']}...",
+                            platform,
+                            product_display,
                             str(transaction['ilosc']),
                             f"{transaction['cena_jednostkowa_pln']:.2f}",
                             f"{transaction['wartosc_sprzedazy_pln']:.2f}",
                             f"{transaction['zysk_brutto']:.2f}"
                         ])
                     
-                    trans_table = Table(trans_data, colWidths=[2.5*cm, 2*cm, 4*cm, 1.5*cm, 2*cm, 2*cm, 2*cm])
+                    trans_table = Table(trans_data, colWidths=[2.5*cm, 2.5*cm, 5*cm, 1.5*cm, 2*cm, 2*cm, 2*cm])
                     trans_table.setStyle(TableStyle([
                         ('FONTNAME', (0, 0), (-1, -1), font_name),
                         ('FONTSIZE', (0, 0), (-1, -1), 8),
                         ('GRID', (0, 0), (-1, -1), 1, colors.black),
                         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (3, 0), (3, -1), 'CENTER'),
-                        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
+                        ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Data - wyśrodkowana
+                        ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Platforma - wyśrodkowana
+                        ('ALIGN', (3, 0), (3, -1), 'CENTER'),  # Ilość - wyśrodkowana
+                        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),  # Cena, Wartość, Zysk - do prawej
                         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('WORDWRAP', (2, 1), (2, -1), True),  # Włącz zawijanie tekstu dla kolumny produktu
                     ]))
                     
                     story.append(trans_table)
@@ -3055,7 +3073,7 @@ class BackupDialog(QDialog):
                                 sub_widget.setEnabled(enabled)
     
     def browse_backup_path(self):
-        """Wybierz ścieżkę do zapisania kopii"""
+        """Wybierz ścieżka do zapisania kopii"""
         default_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
         path, _ = QFileDialog.getSaveFileName(
             self, "Zapisz kopię zapasową",
