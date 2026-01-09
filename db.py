@@ -492,7 +492,7 @@ class DB:
             rows = self.conn.execute("""
                 SELECT
                     o.id,
-                    o.platform,
+                    o.platform,  # <-- To pobiera właściwą nazwę platformy z bazy
                     o.total_pln,
                     o.total_eur,
                     o.purchase_cost,

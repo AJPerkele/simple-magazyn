@@ -9,7 +9,7 @@ from db import DB
 from currency import get_eur_rate
 from config import Config
 
-PLATFORMS = ["Vinted", "OLX", "Allegro Lokalnie", "Inne"]
+PLATFORMS = ["Vinted", "OLX", "Allegro Lokalnie", "FB Marketplace", "Inne"]
 
 # ================== WERSJA ==================
 try:
@@ -2309,8 +2309,18 @@ class SaleDialog(QDialog):
         self.setWindowTitle("Dodaj sprzedaż")
         v = QVBoxLayout(self)
         
+        # Platforma z możliwością wprowadzenia własnej nazwy dla opcji "Inne"
         self.platform = QComboBox()
         self.platform.addItems(PLATFORMS)
+        self.platform.currentTextChanged.connect(self.on_platform_changed)
+        
+        # Pole do wprowadzenia własnej nazwy platformy (widoczne tylko dla "Inne")
+        self.custom_platform_label = QLabel("Wprowadź nazwę platformy:")
+        self.custom_platform_label.setVisible(False)
+        self.custom_platform_input = QLineEdit()
+        self.custom_platform_input.setPlaceholderText("np. Allegro, eBay, własny sklep...")
+        self.custom_platform_input.setVisible(False)
+        
         self.pln = QDoubleSpinBox()
         self.pln.setMaximum(1e9)
         self.pln.valueChanged.connect(self.update_fifo_cost)
@@ -2345,6 +2355,8 @@ class SaleDialog(QDialog):
         
         form = QFormLayout()
         form.addRow("Platforma", self.platform)
+        form.addRow(self.custom_platform_label)
+        form.addRow(self.custom_platform_input)
         form.addRow("Cena PLN", self.pln)
         form.addRow("Data", self.date)
         form.addRow("", self.auto_cost_label)
@@ -2381,6 +2393,23 @@ class SaleDialog(QDialog):
         v.addLayout(button_layout)
         
         self.fifo_cost = 0.0
+
+    def on_platform_changed(self, platform_name):
+        """Pokazuje/ukrywa pole do wprowadzenia własnej nazwy platformy"""
+        if platform_name == "Inne":
+            self.custom_platform_label.setVisible(True)
+            self.custom_platform_input.setVisible(True)
+            self.custom_platform_input.setFocus()
+        else:
+            self.custom_platform_label.setVisible(False)
+            self.custom_platform_input.setVisible(False)
+
+    def get_platform_name(self):
+        """Zwraca właściwą nazwę platformy (użytkownika lub domyślną)"""
+        if self.platform.currentText() == "Inne":
+            custom_name = self.custom_platform_input.text().strip()
+            return custom_name if custom_name else "Inne"
+        return self.platform.currentText()
 
     def toggle_invoice_fields(self, checked):
         """Pokazuje/ukrywa pola danych klienta w zależności od zaznaczenia checkboxa"""
@@ -2623,7 +2652,7 @@ class SaleDialog(QDialog):
                 ["Numer rachunku:", invoice_number],
                 ["Data sprzedaży:", self.date.date().toString("dd.MM.yyyy")],
                 ["Data wystawienia:", QDate.currentDate().toString("dd.MM.yyyy")],
-                ["Platforma:", self.platform.currentText()],
+                ["Platforma:", self.get_platform_name()],
             ]
             
             invoice_table = Table(invoice_data, colWidths=[6*cm, 12*cm])
@@ -2792,8 +2821,9 @@ class SaleDialog(QDialog):
             eur = 0
         
         try:
+            # Używamy get_platform_name() zamiast currentText()
             sale_id = self.db.add_sale_order_with_reset(
-                self.platform.currentText(),
+                self.get_platform_name(),
                 self.pln.value(),
                 eur,
                 date,
@@ -4057,6 +4087,8 @@ class MainWindow(QMainWindow):
                 <li><b>NOWE:</b> Limity kwartalne od 2026 roku</li>
                 <li><b>NOWE:</b> Raporty kwartalne z automatycznymi obliczeniami</li>
                 <li><b>NOWE:</b> Zapamiętywanie ostatnio używanej bazy danych</li>
+                <li><b>NOWE:</b> Dodano platformę FB Marketplace</li>
+                <li><b>NOWE:</b> Możliwość wprowadzenia własnej nazwy platformy dla opcji "Inne"</li>
             </ul>
             
             <h3>Licencja GNU GPL v3.0:</h3>
@@ -4091,6 +4123,8 @@ class MainWindow(QMainWindow):
                 <li><b>NOWE:</b> Limity kwartalne od 2026 roku</li>
                 <li><b>NOWE:</b> Raporty kwartalne z automatycznymi obliczeniami</li>
                 <li><b>NOWE:</b> Zapamiętywanie ostatnio używanej bazy danych</li>
+                <li><b>NOWE:</b> Dodano platformę FB Marketplace</li>
+                <li><b>NOWE:</b> Możliwość wprowadzenia własnej nazwy platformy dla opcji "Inne"</li>
             </ul>
             
             <p><i>Ostatnia aktualizacja: v{APP_VERSION}</i></p>
