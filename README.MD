@@ -1,85 +1,149 @@
-# 🏪 System Magazynowo-Sprzedażowy v2.1.0
+# System Magazynowo-Sprzedażowy
 
-<div align="center">
-  
-![Python](https://img.shields.io/badge/python-3.8%2B-blue)
-![License](https://img.shields.io/badge/license-GPL%20v3.0-green)
-![Version](https://img.shields.io/badge/version-2.1.0-orange)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Mac-lightgrey)
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-GPLv3-green)
+![Status](https://img.shields.io/badge/status-stable-brightgreen)
 
-**Kompletny system do zarządzania magazynem, sprzedażą i ewidencji dla działalności nierejestrowanej**
+Kompleksowy system do zarządzania magazynem, sprzedażą i ewidencją dla działalności nierejestrowanej z uwzględnieniem polskich przepisów podatkowych.
 
-![screenshot](https://github.com/AJPerkele/simple-magazyn/blob/main/main.png)
+## ✨ Kluczowe funkcje
 
-</div>
+### 🆕 Nowości w wersji 2.1.0
+- ✅ **FB Marketplace** - dodano nową platformę sprzedażową
+- ✅ **Własna nazwa platformy** - dla opcji "Inne" możesz wpisać dowolną nazwę
+- ✅ **Limity kwartalne od 2026** - automatyczne obliczanie według nowych przepisów
+- ✅ **Zapamiętywanie ostatniej bazy** - program pamięta którą bazę ostatnio otworzyłeś
+- ✅ **Raporty kwartalne** - z automatycznymi obliczeniami limitów
 
----
+### 🏪 Zarządzanie magazynem
+- Dodawanie/edycja/usuwanie produktów
+- Śledzenie stanów magazynowych
+- System zakupów z automatycznym naliczaniem kosztów
+- Inwentaryzacja z korektą stanów
 
-## 📋 Spis treści
-- [✨ Funkcje](#-funkcje)
-- [🚀 Szybki start](#-szybki-start)
-- [🖥️ Instalacja](#️-instalacja)
-- [📊 Przeznaczenie](#-przeznaczenie)
-- [🔧 Konfiguracja](#-konfiguracja)
-- [📁 Struktura projektu](#-struktura-projektu)
-- [🤝 Wsparcie](#-wsparcie)
-- [📄 Licencja](#-licencja)
+### 💰 Sprzedaż i rachunki
+- Dodawanie sprzedaży z automatycznym obliczaniem zysku (system FIFO)
+- Generowanie rachunków uproszczonych w PDF
+- Obsługa platform: Vinted, OLX, Allegro Lokalnie, FB Marketplace, własne nazwy
+- Historia sprzedaży i rachunków
 
----
+### 📊 Raporty i analizy
+- Raporty miesięczne, kwartalne, roczne i okresowe
+- Ewidencja dla Urzędu Skarbowego
+- Automatyczne obliczanie limitów działalności nierejestrowanej
+- Eksport do CSV, Excel (XLSX), PDF
+- Bezpośrednie drukowanie z programu
 
-## ✨ Funkcje
+### ⚙️ Zaawansowane funkcje
+- Konfiguracja danych osobowych
+- Ustawienia rachunków (numeracja, stopki, logo)
+- Zarządzanie wieloma bazami danych
+- Import/export danych
+- Kopia zapasowa i archiwizacja
+- Integracja z kursem EUR (NBP)
 
-### 🏬 **Zarządzanie Magazynem**
-- ✅ Dodawanie/usuwanie produktów z unikalnym SKU
-- ✅ Śledzenie stanów magazynowych w czasie rzeczywistym
-- ✅ System FIFO (First-In-First-Out) dla kosztów zakupu
-- ✅ Inwentaryzacja z możliwością korekty stanów
-- ✅ Historia zakupów i sprzedaży
+## 📦 Szybka instalacja
 
-### 💰 **Ewidencja Finansowa**
-- ✅ Sprzedaż z wyborem platformy (Vinted, OLX, Allegro Lokalnie)
-- ✅ Automatyczne kursy EUR z API NBP
-- ✅ Kalkulacja zysków z kosztami FIFO
-- ✅ Analiza rentowności produktów
-- ✅ Eksport danych do CSV i Excel
+1. **Pobierz kod:**
+```bash
+git clone https://github.com/twoj-uzytkownik/system-magazynowy.git
+cd system-magazynowy
+```
 
-### 🧾 **Rachunki Uproszczone**
-- ✅ Automatyczne generowanie rachunków w PDF
-- ✅ Konfigurowalna numeracja i wygląd
-- ✅ Dane zgodne z wymogami Urzędu Skarbowego
-- ✅ Historia rachunków z możliwością przeglądu
-- ✅ Opcja automatycznego otwierania PDF
+2. **Zainstaluj zależności:**
+```bash
+pip install -r requirements.txt
+```
 
-### 📊 **Raporty dla US**
-- ✅ Ewidencja uproszczona z danymi osobowymi
-- ✅ Automatyczne liczenie narastające przychodów
-- ✅ Analiza progu limitu działalności nierejestrowanej
-- ✅ Raporty miesięczne i roczne
-- ✅ Podsumowania finansowe
-
-### ⚙️ **Konfiguracja**
-- ✅ Konfigurowalne dane sprzedawcy
-- ✅ Ustawienia wyglądu rachunków
-- ✅ Opcjonalne dane firmy
-- ✅ Resetowanie numeracji
-- ✅ Backup konfiguracji w JSON
-
----
+3. **Uruchom program:**
+```bash
+python app.py
+```
 
 ## 🚀 Szybki start
 
-### **Wymagania:**
-- Python 3.8 lub nowszy
-- SQLite3 (zazwyczaj preinstalowany)
-- 100MB wolnego miejsca
+### Pierwsze uruchomienie
+1. Program utworzy domyślną bazę `data.db`
+2. Wprowadź swoje dane osobowe w **Konfiguracja → Dane osobiste**
+3. Skonfiguruj limity US w **Konfiguracja → Dodatkowe → Limity US**
 
-### **Linux/Mac:**
-```bash
-# Pobierz i nadaj uprawnienia
-chmod +x install.sh run.sh
+### Dodawanie produktów
+1. Kliknij **➕ Dodaj produkt** na pasku narzędzi
+2. Wprowadź SKU i nazwę produktu
+3. Ustal stan początkowy (opcjonalnie)
 
-# Uruchom instalator
-./install.sh
+### Sprzedaż z rachunkiem
+1. Wybierz **💰 Dodaj sprzedaż**
+2. Wybierz platformę (dla "Inne" możesz wpisać własną nazwę)
+3. Dodaj produkty i ilości
+4. System automatycznie obliczy koszt zakupu (FIFO)
+5. Zaznacz "Wygeneruj rachunek uproszczony" jeśli potrzebujesz
 
-# Uruchom aplikację
-./run.sh
+### Generowanie raportów
+1. Przejdź do **Raporty → Wybierz typ raportu**
+2. Ustaw okres (miesiąc, kwartał, rok, lub własny zakres)
+3. Wybierz format eksportu
+4. Pobierz lub wydrukuj raport
+
+## 📁 Struktura plików
+
+```
+system-magazynowy/
+├── app.py              # Główna aplikacja
+├── config.py           # Obsługa konfiguracji
+├── db.py               # Baza danych SQLite
+├── currency.py         # Kursy walut NBP
+├── config.json         # Ustawienia użytkownika
+├── data.db             # Domyślna baza danych
+├── backups/            # Kopie zapasowe
+├── rachunki/           # Wygenerowane rachunki
+└── requirements.txt    # Wymagane pakiety
+```
+
+## ⚡ Wymagania minimalne
+
+- **Python 3.8+**
+- **Windows 10/11, macOS, lub Linux**
+- **2GB RAM**
+- **100MB wolnego miejsca na dysku**
+
+## 📞 Wsparcie i pomoc
+
+### Typowe problemy:
+- **Brak openpyxl**: `pip install openpyxl`
+- **Brak polskich znaków w PDF**: Zainstaluj czcionkę Arial
+- **Nie można otworzyć bazy**: Użyj **Plik → Otwórz bazę danych**
+
+### Raportowanie błędów:
+1. Sprawdź Issues na GitHub
+2. Podaj wersję systemu i Pythona
+3. Dołącz zrzut ekranu błędu
+
+## 📄 Licencja
+
+**GNU General Public License v3.0**
+
+- Możesz używać, modyfikować i rozpowszechniać
+- Musisz udostępnić kod źródłowy modyfikacji
+- Zmodyfikowane wersje muszą mieć tę samą licencję
+
+## 🌟 Dlaczego ten system?
+
+### Dla kogo jest ten program?
+- **Sprzedawcy na Vinted/OLX** - ewidencja przychodów
+- **Drobni przedsiębiorcy** - zarządzanie magazynem
+- **Osoby na działalności nierejestrowanej** - rozliczenia z US
+- **Kolekcjonerzy** - inwentaryzacja zbiorów
+
+### Co wyróżnia ten system?
+- 🎯 **Prosty interfejs** - bez zbędnych komplikacji
+- 🏷️ **Polskie przepisy** - dostosowany do lokalnych wymagań
+- 📊 **Automatyczne raporty** - gotowe do wydruku dla US
+- 🔒 **Bezpieczeństwo danych** - lokalna baza SQLite
+- 💰 **Darmowy i otwarty** - żadnych ukrytych kosztów
+
+---
+
+**Uwaga**: Program jest przeznaczony do użytku osobistego. Przed użyciem do celów biznesowych skonsultuj się z doradcą podatkowym.
+
+*Wersja 2.1.0 | Styczeń 2024*
