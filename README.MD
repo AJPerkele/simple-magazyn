@@ -12,7 +12,7 @@ Kompleksowy system do zarządzania magazynem, sprzedażą i ewidencją dla dzia�
 - ✅ **FB Marketplace** - dodano nową platformę sprzedażową
 - ✅ **Własna nazwa platformy** - dla opcji "Inne" możesz wpisać dowolną nazwę
 - ✅ **Limity kwartalne od 2026** - automatyczne obliczanie według nowych przepisów
-- ✅ **Zapamiętywanie ostatniej bazy** - program pamięta którą bazę ostatnio otworzyłeś
+- ✅ **Zapamiętywanie ostatniej bazy** - program pamięta którą bazę ostatnio otworzyłeś - wymaga poprawy
 - ✅ **Raporty kwartalne** - z automatycznymi obliczeniami limitów
 
 ### 🏪 Zarządzanie magazynem
