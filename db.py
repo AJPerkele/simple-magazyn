@@ -959,12 +959,21 @@ class DB:
     def export_detailed_report_csv(self, path, date_from, date_to, 
                                  include_purchases=True, include_sales=True,
                                  include_summary=True, include_products=False,
-                                 personal_data=None):
+                                 personal_data=None, report_type=None, config=None):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f, delimiter=";")
                 
-                w.writerow([f"EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"])
+                # Użyj report_type w tytule jeśli dostępny
+                title = "EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+                if report_type == "quarterly":
+                    title = "KWARTALNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+                elif report_type == "monthly":
+                    title = "MIESIĘCZNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+                elif report_type == "yearly":
+                    title = "ROCZNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+                
+                w.writerow([title])
                 w.writerow([f"Okres: {date_from} - {date_to}"])
                 w.writerow([f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
                 w.writerow([])
@@ -1043,14 +1052,37 @@ class DB:
                         ])
                     w.writerow([])
                     
+                    # Użyj config jeśli dostępny do pobrania limitów
                     minimal_wage = 4242
-                    limit = 0.75 * minimal_wage
-                    total_revenue = register_data['podsumowanie_ogolne']['przychod_calkowity']
+                    limit_multiplier = 0.75  # domyślnie miesięczny
                     
-                    w.writerow([f"ANALIZA PROGU LIMITU ({date_from[:4]} r.)"])
+                    if config:
+                        try:
+                            year = int(date_from[:4])
+                            minimal_wage = config.get_minimal_wage(year)
+                            
+                            # Sprawdź czy to raport kwartalny i czy używamy limitów kwartalnych
+                            if report_type == "quarterly" and config.use_quarterly_limits():
+                                limit_multiplier = config.get_limits_config().get("quarterly_limit_multiplier", 2.25)
+                                limit = minimal_wage * limit_multiplier
+                                limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia (limit kwartalny)"
+                            else:
+                                limit = minimal_wage * 0.75
+                                limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                        except:
+                            limit = minimal_wage * 0.75
+                            limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                    else:
+                        limit = minimal_wage * 0.75
+                        limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                    
+                    total_revenue = register_data['podsumowanie_ogolne']['przychod_calkowity']
+                    year = date_from[:4]
+                    
+                    w.writerow([f"ANALIZA PROGU LIMITU ({year} r.)"])
                     w.writerow([f"Minimalne wynagrodzenie: {minimal_wage} PLN"])
-                    w.writerow([f"75% minimalnego wynagrodzenia: {limit:.2f} PLN"])
-                    w.writerow([f"Przychód narastająco w roku {date_from[:4]}: {total_revenue:.2f} PLN"])
+                    w.writerow([f"{limit_text}: {limit:.2f} PLN"])
+                    w.writerow([f"Przychód narastająco w roku {year}: {total_revenue:.2f} PLN"])
                     
                     if total_revenue > limit:
                         w.writerow(["UWAGA: Przekroczono limit działalności nierejestrowanej!"])
@@ -1072,7 +1104,7 @@ class DB:
     def export_detailed_report_excel(self, path, date_from, date_to,
                                    include_purchases=True, include_sales=True,
                                    include_summary=True, include_products=False,
-                                   personal_data=None):
+                                   personal_data=None, report_type=None, config=None):
         if not HAS_EXCEL:
             raise ImportError("Biblioteka openpyxl nie jest zainstalowana. Użyj: pip install openpyxl")
         
@@ -1097,7 +1129,17 @@ class DB:
             ws_summary.title = "Podsumowanie"
             
             row = 1
-            ws_summary.cell(row=row, column=1, value="EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ")
+            
+            # Tytuł zależny od typu raportu
+            title = "EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+            if report_type == "quarterly":
+                title = "KWARTALNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+            elif report_type == "monthly":
+                title = "MIESIĘCZNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+            elif report_type == "yearly":
+                title = "ROCZNA EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"
+            
+            ws_summary.cell(row=row, column=1, value=title)
             ws_summary.cell(row=row, column=1).font = Font(bold=True, size=14)
             row += 2
             
@@ -1217,14 +1259,38 @@ class DB:
                 ws_analysis = wb.create_sheet("Analiza progu US")
                 ws_analysis.cell(row=1, column=1, value="ANALIZA PROGU LIMITU DLA US").font = Font(bold=True, size=14, color="FF0000")
                 
+                # Użyj config jeśli dostępny do pobrania limitów
                 minimal_wage = 4242
-                limit = 0.75 * minimal_wage
+                limit_multiplier = 0.75  # domyślnie miesięczny
+                limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                
+                if config:
+                    try:
+                        year = int(date_from[:4])
+                        minimal_wage = config.get_minimal_wage(year)
+                        
+                        # Sprawdź czy to raport kwartalny i czy używamy limitów kwartalnych
+                        if report_type == "quarterly" and config.use_quarterly_limits():
+                            limit_multiplier = config.get_limits_config().get("quarterly_limit_multiplier", 2.25)
+                            limit = minimal_wage * limit_multiplier
+                            limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia (limit kwartalny)"
+                        else:
+                            limit = minimal_wage * 0.75
+                            limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                    except:
+                        limit = minimal_wage * 0.75
+                        limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                else:
+                    limit = minimal_wage * 0.75
+                    limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                
                 total_revenue = register_data['podsumowanie_ogolne']['przychod_calkowity']
+                year = date_from[:4]
                 
                 analysis_data = [
                     ["Parametr", "Wartość"],
                     ["Minimalne wynagrodzenie", f"{minimal_wage} PLN"],
-                    ["75% minimalnego wynagrodzenia (limit)", f"{limit:.2f} PLN"],
+                    [limit_text, f"{limit:.2f} PLN"],
                     ["Przychód narastająco", f"{total_revenue:.2f} PLN"],
                     ["", ""],
                     ["ANALIZA:", ""]
@@ -1246,6 +1312,19 @@ class DB:
                     ws_analysis.cell(row=row_analysis, column=1, value="OK: W LIMICIE")
                     ws_analysis.cell(row=row_analysis, column=1).font = cumulative_font
                     ws_analysis.cell(row=row_analysis, column=2, value="Działalność nierejestrowana może być kontynuowana")
+                
+                # Dodatkowe informacje dla raportów kwartalnych
+                if report_type == "quarterly" and config and config.use_quarterly_limits():
+                    row_analysis += 2
+                    ws_analysis.cell(row=row_analysis, column=1, value="UWAGA OD 2026 ROKU:")
+                    ws_analysis.cell(row=row_analysis, column=1).font = Font(bold=True, color="2E7D32")
+                    row_analysis += 1
+                    ws_analysis.cell(row=row_analysis, column=1, value="Od 2026 roku obowiązują limity kwartalne dla działalności nierejestrowanej.")
+                    row_analysis += 1
+                    ws_analysis.cell(row=row_analysis, column=1, value=f"Limit kwartalny wynosi {limit_multiplier*100:.0f}% minimalnego wynagrodzenia.")
+                    row_analysis += 1
+                    ws_analysis.cell(row=row_analysis, column=1, value=f"Przychód w tym kwartale: {total_revenue:.2f} PLN")
+                    ws_analysis.cell(row=row_analysis, column=1).font = Font(bold=True)
                 
                 for ws in [ws_summary, ws_monthly, ws_details, ws_analysis]:
                     for col in range(1, 20):
