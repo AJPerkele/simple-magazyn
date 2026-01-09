@@ -1,3 +1,14 @@
+# System Magazynowo-Sprzedażowy v2.0.0
+# Wymagania systemowe
+
 PySide6>=6.5.0
+reportlab>=4.0.0
 requests>=2.31.0
 openpyxl>=3.1.0
+
+# Opcjonalne (dla lepszego wyświetlania PDF)
+pillow>=10.0.0
+
+# Development
+black>=23.0.0
+flake8>=6.0.0

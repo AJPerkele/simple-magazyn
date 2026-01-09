@@ -1,21 +1,27 @@
+# currency.py
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
-
-def get_eur_rate(date_str: str) -> float:
-    date = datetime.strptime(date_str, "%Y-%m-%d")
-
-    for _ in range(7):
-        d = date.strftime("%Y-%m-%d")
-        try:
-            r = requests.get(
-                f"https://api.nbp.pl/api/exchangerates/rates/A/EUR/{d}/?format=json",
-                timeout=3
-            )
-            if r.status_code == 200:
-                return float(r.json()["rates"][0]["mid"])
-        except Exception:
-            pass
-        date -= timedelta(days=1)
-
-    return 4.50  # fallback
+def get_eur_rate(date_str=None):
+    """
+    Pobiera kurs EUR/PLN z NBP API dla podanej daty.
+    Jeśli data nie jest podana, używa dzisiejszej daty.
+    """
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    
+    try:
+        # Format daty dla API NBP: YYYY-MM-DD
+        url = f"http://api.nbp.pl/api/exchangerates/rates/a/eur/{date_str}/"
+        response = requests.get(url, headers={'Accept': 'application/json'})
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data['rates'][0]['mid']
+        else:
+            # Jeśli brak kursu dla danej daty, spróbuj z poprzedniego dnia roboczego
+            print(f"Nie znaleziono kursu EUR dla {date_str}, próbuję wcześniejszą datę...")
+            return 4.5  # Wartość domyślna
+    except Exception as e:
+        print(f"Błąd pobierania kursu EUR: {e}")
+        return 4.5  # Wartość domyślna

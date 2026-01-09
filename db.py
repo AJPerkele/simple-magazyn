@@ -28,8 +28,6 @@ class DB:
             stock INTEGER DEFAULT 0
         );
 
-        /* ===== ZAKUPY ===== */
-
         CREATE TABLE IF NOT EXISTS purchase_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             total_pln REAL,
@@ -54,8 +52,6 @@ class DB:
             sale_order_id INTEGER DEFAULT NULL
         );
 
-        /* ===== SPRZEDAŻ ===== */
-
         CREATE TABLE IF NOT EXISTS sales_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             platform TEXT,
@@ -71,9 +67,21 @@ class DB:
             product_id INTEGER,
             qty INTEGER
         );
+
+        CREATE TABLE IF NOT EXISTS invoices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_number TEXT UNIQUE,
+            sale_order_id INTEGER,
+            file_path TEXT,
+            customer_name TEXT,
+            customer_address TEXT,
+            issue_date TEXT,
+            total_amount REAL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sale_order_id) REFERENCES sales_orders(id) ON DELETE SET NULL
+        );
         """)
         
-        # Dodaj brakujące kolumny
         try:
             c.execute("SELECT purchase_cost FROM sales_orders LIMIT 1")
         except sqlite3.OperationalError:
@@ -111,17 +119,14 @@ class DB:
         self.conn.commit()
 
     def check_sku_exists(self, sku):
-        """Sprawdza czy SKU już istnieje"""
         r = self.conn.execute("SELECT id FROM products WHERE sku=?", (sku,)).fetchone()
         return r is not None
 
     def get_product_id_by_sku(self, sku):
-        """Zwraca ID produktu po SKU"""
         r = self.conn.execute("SELECT id FROM products WHERE sku=?", (sku,)).fetchone()
         return r["id"] if r else None
 
     def delete_product(self, pid):
-        """Usuwa produkt i powiązane rekordy"""
         c = self.conn.cursor()
         
         product = self.get_product_info(pid)
@@ -131,6 +136,7 @@ class DB:
         c.execute("DELETE FROM purchase_items WHERE product_id=?", (pid,))
         c.execute("DELETE FROM sales_items WHERE product_id=?", (pid,))
         c.execute("DELETE FROM purchase_stock_history WHERE product_id=?", (pid,))
+        c.execute("DELETE FROM invoices WHERE sale_order_id IN (SELECT id FROM sales_orders WHERE id IN (SELECT order_id FROM sales_items WHERE product_id=?))", (pid,))
         c.execute("DELETE FROM products WHERE id=?", (pid,))
         
         self.conn.commit()
@@ -146,7 +152,6 @@ class DB:
         )
         self.conn.commit()
 
-    # ---------- CHECK STOCK ----------
     def check_stock(self, pid: int, required_qty: int) -> bool:
         r = self.conn.execute("SELECT stock FROM products WHERE id=?", (pid,)).fetchone()
         if not r:
@@ -160,11 +165,9 @@ class DB:
     def add_purchase_order(self, total_pln, date, items):
         c = self.conn.cursor()
         
-        # Znajdź największe istniejące ID i pierwsze wolne
         max_id_result = c.execute("SELECT MAX(id) as max_id FROM purchase_orders").fetchone()
         max_id = max_id_result["max_id"] or 0
         
-        # Znajdź pierwsze wolne ID (lukę)
         all_ids = [row[0] for row in c.execute("SELECT id FROM purchase_orders ORDER BY id").fetchall()]
         new_id = 1
         for existing_id in all_ids:
@@ -173,11 +176,9 @@ class DB:
             else:
                 break
         
-        # Jeśli nie ma luk, użyj max_id + 1
         if new_id > max_id:
             new_id = max_id + 1
         
-        # Wstaw z określonym ID
         c.execute(
             "INSERT INTO purchase_orders(id,total_pln,date) VALUES(?,?,?)",
             (new_id, total_pln, date)
@@ -189,11 +190,9 @@ class DB:
         for pid, qty in items:
             unit_cost = (total_pln / total_qty) if total_qty > 0 else 0
             
-            # Znajdź ID dla purchase_items
             max_pi_id = c.execute("SELECT MAX(id) as max_id FROM purchase_items").fetchone()
             max_pi_id_val = max_pi_id["max_id"] or 0
             
-            # Znajdź luki w ID dla purchase_items
             pi_ids = [row[0] for row in c.execute("SELECT id FROM purchase_items ORDER BY id").fetchall()]
             new_pi_id = 1
             for existing_id in pi_ids:
@@ -212,7 +211,6 @@ class DB:
             
             purchase_item_id = new_pi_id
             
-            # Znajdź ID dla purchase_stock_history
             max_psh_id = c.execute("SELECT MAX(id) as max_id FROM purchase_stock_history").fetchone()
             max_psh_id_val = max_psh_id["max_id"] or 0
             
@@ -241,9 +239,7 @@ class DB:
         self.conn.commit()
         return oid
 
-    # ---------- HISTORIA ZAKUPÓW ----------
     def list_purchases(self):
-        """Zwraca listę krotek dla historii zakupów"""
         try:
             rows = self.conn.execute("""
                 SELECT
@@ -263,7 +259,6 @@ class DB:
                 ORDER BY o.date DESC, o.id DESC
             """).fetchall()
             
-            # Konwertuj do listy krotek
             result = []
             for r in rows:
                 result.append((
@@ -280,7 +275,6 @@ class DB:
             return []
 
     def get_detailed_purchases(self, date_from, date_to):
-        """Zwraca szczegółowe dane zakupów w danym okresie"""
         try:
             rows = self.conn.execute("""
                 SELECT
@@ -321,22 +315,18 @@ class DB:
             return []
 
     def delete_purchase(self, oid):
-        """Usuwa zamówienie zakupu i odpowiednie ilości z magazynu"""
         try:
             c = self.conn.cursor()
             
-            # Pobierz wszystkie pozycje z tego zamówienia
             rows = c.execute("""
                 SELECT product_id, qty 
                 FROM purchase_items 
                 WHERE order_id=?
             """, (oid,)).fetchall()
 
-            # Zmniejsz stan magazynowy dla każdego produktu
             for r in rows:
                 self.update_stock(r["product_id"], -r["qty"])
 
-            # Usuń z historii stanów magazynowych
             c.execute("""
                 DELETE FROM purchase_stock_history 
                 WHERE purchase_item_id IN (
@@ -344,10 +334,7 @@ class DB:
                 )
             """, (oid,))
             
-            # Usuń pozycje zamówienia
             c.execute("DELETE FROM purchase_items WHERE order_id=?", (oid,))
-            
-            # Usuń zamówienie
             c.execute("DELETE FROM purchase_orders WHERE id=?", (oid,))
             
             self.conn.commit()
@@ -359,7 +346,6 @@ class DB:
     # ---------- FIFO FUNCTIONS ----------
     def get_fifo_batches(self, pid: int, required_qty: int):
         try:
-            # Sprawdź czy tabela istnieje
             c = self.conn.cursor()
             c.execute("SELECT 1 FROM purchase_stock_history LIMIT 1")
         except sqlite3.OperationalError:
@@ -434,17 +420,13 @@ class DB:
 
     # ---------- SALES ----------
     def add_sale_order_with_reset(self, platform, total_pln, total_eur, date, items, purchase_cost=0):
-        """Dodaje zamówienie sprzedaży z resetowanym ID"""
         c = self.conn.cursor()
         
-        # Znajdź największe istniejące ID i pierwsze wolne
         max_id_result = c.execute("SELECT MAX(id) as max_id FROM sales_orders").fetchone()
         max_id = max_id_result["max_id"] or 0
         
-        # Znajdź wszystkie istniejące ID
         all_ids = [row[0] for row in c.execute("SELECT id FROM sales_orders ORDER BY id").fetchall()]
         
-        # Znajdź pierwsze wolne ID (lukę)
         new_id = 1
         for existing_id in all_ids:
             if existing_id == new_id:
@@ -452,11 +434,9 @@ class DB:
             else:
                 break
         
-        # Jeśli nie ma luk, użyj max_id + 1
         if new_id > max_id:
             new_id = max_id + 1
         
-        # Wstaw z określonym ID
         c.execute("""
             INSERT INTO sales_orders(id,platform,total_pln,total_eur,purchase_cost,date)
             VALUES(?,?,?,?,?,?)
@@ -466,11 +446,9 @@ class DB:
         total_purchase_cost = 0
         
         for pid, qty in items:
-            # Znajdź ID dla sales_items
             max_si_id = c.execute("SELECT MAX(id) as max_id FROM sales_items").fetchone()
             max_si_id_val = max_si_id["max_id"] or 0
             
-            # Znajdź luki w ID dla sales_items
             si_ids = [row[0] for row in c.execute("SELECT id FROM sales_items ORDER BY id").fetchall()]
             new_si_id = 1
             for existing_id in si_ids:
@@ -487,7 +465,6 @@ class DB:
                 VALUES(?,?,?,?)
             """, (new_si_id, sale_order_id, pid, qty))
             
-            # Spróbuj alokować stan FIFO
             try:
                 item_cost = self.allocate_fifo_stock(pid, qty, sale_order_id)
                 total_purchase_cost += item_cost
@@ -497,7 +474,6 @@ class DB:
             
             self.update_stock(pid, -qty)
 
-        # Aktualizuj całkowity koszt zakupu
         if total_purchase_cost > 0:
             c.execute("""
                 UPDATE sales_orders 
@@ -509,12 +485,9 @@ class DB:
         return sale_order_id
 
     def add_sale_order(self, platform, total_pln, total_eur, date, items, purchase_cost=0):
-        """Dodaje zamówienie sprzedaży z autoincrement (dla kompatybilności)"""
         return self.add_sale_order_with_reset(platform, total_pln, total_eur, date, items, purchase_cost)
 
-    # ---------- HISTORIA SPRZEDAŻY ----------
     def list_sales(self):
-        """Zwraca listę krotek dla historii sprzedaży"""
         try:
             rows = self.conn.execute("""
                 SELECT
@@ -532,7 +505,6 @@ class DB:
                 ORDER BY o.date DESC, o.id DESC
             """).fetchall()
         except sqlite3.OperationalError as e:
-            # Jeśli kolumna purchase_cost nie istnieje
             rows = self.conn.execute("""
                 SELECT
                     o.id,
@@ -549,7 +521,6 @@ class DB:
                 ORDER BY o.date DESC, o.id DESC
             """).fetchall()
         
-        # Konwertuj do listy krotek
         result = []
         for r in rows:
             profit = r["total_pln"] - (r["purchase_cost"] or 0)
@@ -566,7 +537,6 @@ class DB:
         return result
 
     def get_detailed_sales(self, date_from, date_to):
-        """Zwraca szczegółowe dane sprzedaży w danym okresie"""
         try:
             rows = self.conn.execute("""
                 SELECT
@@ -625,11 +595,12 @@ class DB:
             return []
 
     def delete_sale(self, oid):
-        """Usuwa zamówienie sprzedaży i przywraca stan magazynowy"""
         try:
             c = self.conn.cursor()
             
-            # Spróbuj przywrócić stan z historii FIFO
+            # Sprawdź czy dla tej sprzedaży istnieje faktura
+            invoice = c.execute("SELECT invoice_number FROM invoices WHERE sale_order_id=?", (oid,)).fetchone()
+            
             try:
                 purchase_items = c.execute("""
                     SELECT psh.purchase_item_id, psh.product_id
@@ -652,7 +623,6 @@ class DB:
             except:
                 pass
             
-            # Przywróć stan produktów
             rows = c.execute("""
                 SELECT product_id, qty FROM sales_items WHERE order_id=?
             """, (oid,)).fetchall()
@@ -660,17 +630,290 @@ class DB:
             for r in rows:
                 self.update_stock(r["product_id"], r["qty"])
 
-            # Usuń pozycje sprzedaży
             c.execute("DELETE FROM sales_items WHERE order_id=?", (oid,))
-            
-            # Usuń zamówienie sprzedaży
             c.execute("DELETE FROM sales_orders WHERE id=?", (oid,))
+            
+            # Nie usuwamy faktury z bazy, tylko odłączamy od sprzedaży
+            if invoice:
+                c.execute("UPDATE invoices SET sale_order_id = NULL WHERE sale_order_id = ?", (oid,))
             
             self.conn.commit()
             return True
         except Exception as e:
             print(f"Błąd w delete_sale: {e}")
             return False
+
+    # ---------- INVOICES ----------
+    def add_invoice(self, invoice_number, sale_order_id, file_path, 
+                    customer_name="", customer_address="", issue_date=None, total_amount=0):
+        if issue_date is None:
+            issue_date = datetime.now().strftime("%Y-%m-%d")
+        
+        try:
+            self.conn.execute("""
+                INSERT INTO invoices (invoice_number, sale_order_id, file_path, 
+                                     customer_name, customer_address, issue_date, total_amount)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (invoice_number, sale_order_id, file_path, customer_name, 
+                  customer_address, issue_date, total_amount))
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            # Jeśli faktura już istnieje, zaktualizuj
+            self.conn.execute("""
+                UPDATE invoices 
+                SET sale_order_id = ?, file_path = ?, customer_name = ?, 
+                    customer_address = ?, issue_date = ?, total_amount = ?
+                WHERE invoice_number = ?
+            """, (sale_order_id, file_path, customer_name, customer_address, 
+                  issue_date, total_amount, invoice_number))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Błąd dodawania faktury: {e}")
+            return False
+
+    def list_invoices(self, date_from=None, date_to=None):
+        try:
+            query = """
+                SELECT 
+                    i.id,
+                    i.invoice_number,
+                    i.sale_order_id,
+                    i.file_path,
+                    i.customer_name,
+                    i.customer_address,
+                    i.issue_date,
+                    i.total_amount,
+                    i.created_at,
+                    s.platform,
+                    s.date as sale_date
+                FROM invoices i
+                LEFT JOIN sales_orders s ON s.id = i.sale_order_id
+            """
+            
+            params = []
+            if date_from and date_to:
+                query += " WHERE i.issue_date BETWEEN ? AND ?"
+                params = [date_from, date_to]
+            
+            query += " ORDER BY i.issue_date DESC, i.created_at DESC"
+            
+            rows = self.conn.execute(query, params).fetchall()
+            
+            result = []
+            for r in rows:
+                result.append({
+                    'id': r['id'],
+                    'invoice_number': r['invoice_number'],
+                    'sale_order_id': r['sale_order_id'],
+                    'file_path': r['file_path'],
+                    'customer_name': r['customer_name'],
+                    'customer_address': r['customer_address'],
+                    'issue_date': r['issue_date'],
+                    'total_amount': r['total_amount'],
+                    'created_at': r['created_at'],
+                    'platform': r['platform'],
+                    'sale_date': r['sale_date']
+                })
+            return result
+        except Exception as e:
+            print(f"Błąd w list_invoices: {e}")
+            return []
+
+    def delete_invoice(self, invoice_id):
+        try:
+            c = self.conn.cursor()
+            
+            # Pobierz ścieżkę do pliku przed usunięciem
+            invoice = c.execute("SELECT file_path FROM invoices WHERE id=?", (invoice_id,)).fetchone()
+            
+            if invoice and invoice['file_path'] and os.path.exists(invoice['file_path']):
+                try:
+                    os.remove(invoice['file_path'])
+                except:
+                    pass  # Nie przerywaj jeśli nie można usunąć pliku
+            
+            c.execute("DELETE FROM invoices WHERE id=?", (invoice_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Błąd usuwania faktury: {e}")
+            return False
+
+    def get_invoice_by_number(self, invoice_number):
+        return self.conn.execute(
+            "SELECT * FROM invoices WHERE invoice_number=?",
+            (invoice_number,)
+        ).fetchone()
+
+    # ---------- SPRZEDAŻ NARASTAJĄCA ----------
+    def get_simple_sales_register_with_cumulative(self, date_from, date_to, personal_data):
+        try:
+            rows = self.conn.execute("""
+                SELECT
+                    o.date as data_sprzedazy,
+                    o.platform as platforma,
+                    pr.sku as kod_produktu,
+                    pr.title as nazwa_produktu,
+                    si.qty as ilosc,
+                    ROUND(o.total_pln / (
+                        SELECT SUM(qty) 
+                        FROM sales_items 
+                        WHERE order_id = o.id
+                    ) * si.qty, 2) as cena_jednostkowa_pln,
+                    ROUND(o.total_pln / (
+                        SELECT SUM(qty) 
+                        FROM sales_items 
+                        WHERE order_id = o.id
+                    ) * si.qty, 2) as wartosc_sprzedazy_pln,
+                    ROUND(o.purchase_cost / (
+                        SELECT SUM(qty) 
+                        FROM sales_items 
+                        WHERE order_id = o.id
+                    ) * si.qty, 2) as koszt_zakupu,
+                    (ROUND(o.total_pln / (
+                        SELECT SUM(qty) 
+                        FROM sales_items 
+                        WHERE order_id = o.id
+                    ) * si.qty, 2) - 
+                     ROUND(o.purchase_cost / (
+                        SELECT SUM(qty) 
+                        FROM sales_items 
+                        WHERE order_id = o.id
+                    ) * si.qty, 2)) as zysk_brutto,
+                    o.id as numer_dokumentu
+                FROM sales_orders o
+                JOIN sales_items si ON si.order_id = o.id
+                JOIN products pr ON pr.id = si.product_id
+                WHERE o.date BETWEEN ? AND ?
+                ORDER BY o.date ASC, o.id ASC, pr.sku
+            """, (date_from, date_to)).fetchall()
+            
+            result = {
+                "sprzedawca": {
+                    "imie_nazwisko": personal_data.get("name", ""),
+                    "adres": personal_data.get("address", ""),
+                    "kod_pocztowy": personal_data.get("postal_code", ""),
+                    "miejscowosc": personal_data.get("city", ""),
+                    "pesel": personal_data.get("pesel", ""),
+                    "nip": personal_data.get("nip", ""),
+                    "regon": personal_data.get("regon", "")
+                },
+                "okres": f"{date_from} - {date_to}",
+                "transakcje": [],
+                "podsumowanie_miesieczne_narastajaco": [],
+                "podsumowanie_roczne_narastajaco": []
+            }
+            
+            cumulative_revenue = 0
+            cumulative_cost = 0
+            cumulative_profit = 0
+            
+            monthly_summary = {}
+            unique_order_ids = set()
+            
+            for r in rows:
+                transaction = {
+                    'data_sprzedazy': r['data_sprzedazy'],
+                    'platforma': r['platforma'],
+                    'kod_produktu': r['kod_produktu'],
+                    'nazwa_produktu': r['nazwa_produktu'],
+                    'ilosc': r['ilosc'],
+                    'cena_jednostkowa_pln': r['cena_jednostkowa_pln'],
+                    'wartosc_sprzedazy_pln': r['wartosc_sprzedazy_pln'],
+                    'koszt_zakupu': r['koszt_zakupu'],
+                    'zysk_brutto': r['zysk_brutto'],
+                    'numer_dokumentu': r['numer_dokumentu'],
+                    'sprzedaz_narastajaca_pln': 0,
+                    'sprzedaz_narastajaca_koszt': 0,
+                    'sprzedaz_narastajaca_zysk': 0
+                }
+                
+                cumulative_revenue += r['wartosc_sprzedazy_pln']
+                cumulative_cost += r['koszt_zakupu']
+                cumulative_profit += r['zysk_brutto']
+                
+                transaction['sprzedaz_narastajaca_pln'] = round(cumulative_revenue, 2)
+                transaction['sprzedaz_narastajaca_koszt'] = round(cumulative_cost, 2)
+                transaction['sprzedaz_narastajaca_zysk'] = round(cumulative_profit, 2)
+                
+                result["transakcje"].append(transaction)
+                
+                year_month = r['data_sprzedazy'][:7]
+                if year_month not in monthly_summary:
+                    monthly_summary[year_month] = {
+                        'przychod': 0,
+                        'koszt': 0,
+                        'zysk': 0,
+                        'unikalne_zamowienia': set(),
+                        'liczba_pozycji': 0
+                    }
+                
+                monthly_summary[year_month]['przychod'] += r['wartosc_sprzedazy_pln']
+                monthly_summary[year_month]['koszt'] += r['koszt_zakupu']
+                monthly_summary[year_month]['zysk'] += r['zysk_brutto']
+                monthly_summary[year_month]['unikalne_zamowienia'].add(r['numer_dokumentu'])
+                monthly_summary[year_month]['liczba_pozycji'] += 1
+                
+                unique_order_ids.add(r['numer_dokumentu'])
+            
+            # Przelicz liczbę transakcji na podstawie unikalnych zamówień
+            for month_data in monthly_summary.values():
+                month_data['liczba_transakcji'] = len(month_data['unikalne_zamowienia'])
+                del month_data['unikalne_zamowienia']
+            
+            cumulative_monthly = 0
+            for year_month in sorted(monthly_summary.keys()):
+                month_data = monthly_summary[year_month]
+                cumulative_monthly += month_data['przychod']
+                
+                result["podsumowanie_miesieczne_narastajaco"].append({
+                    'miesiac': year_month,
+                    'przychod_miesiac': round(month_data['przychod'], 2),
+                    'koszt_miesiac': round(month_data['koszt'], 2),
+                    'zysk_miesiac': round(month_data['zysk'], 2),
+                    'liczba_transakcji': month_data['liczba_transakcji'],
+                    'liczba_pozycji': month_data['liczba_pozycji'],
+                    'przychod_narastajaco': round(cumulative_monthly, 2),
+                    'zysk_narastajaco': round(sum(m['zysk'] for k, m in monthly_summary.items() 
+                                                 if k <= year_month), 2)
+                })
+            
+            result["podsumowanie_roczne_narastajaco"] = []
+            cumulative_yearly = 0
+            
+            yearly_summary = {}
+            for year_month, data in monthly_summary.items():
+                year = year_month[:4]
+                if year not in yearly_summary:
+                    yearly_summary[year] = {'przychod': 0, 'zysk': 0, 'liczba_transakcji': 0}
+                yearly_summary[year]['przychod'] += data['przychod']
+                yearly_summary[year]['zysk'] += data['zysk']
+                yearly_summary[year]['liczba_transakcji'] += data['liczba_transakcji']
+            
+            for year in sorted(yearly_summary.keys()):
+                cumulative_yearly += yearly_summary[year]['przychod']
+                result["podsumowanie_roczne_narastajaco"].append({
+                    'rok': year,
+                    'przychod_rok': round(yearly_summary[year]['przychod'], 2),
+                    'zysk_rok': round(yearly_summary[year]['zysk'], 2),
+                    'liczba_transakcji': yearly_summary[year]['liczba_transakcji'],
+                    'przychod_narastajaco': round(cumulative_yearly, 2)
+                })
+            
+            result["podsumowanie_ogolne"] = {
+                'przychod_calkowity': round(cumulative_revenue, 2),
+                'koszt_calkowity': round(cumulative_cost, 2),
+                'zysk_calkowity': round(cumulative_profit, 2),
+                'liczba_transakcji': len(unique_order_ids),
+                'liczba_pozycji': len(rows)
+            }
+            
+            return result
+        except Exception as e:
+            print(f"Błąd w get_simple_sales_register_with_cumulative: {e}")
+            return None
 
     # ---------- REPORT ----------
     def report(self, d1, d2):
@@ -715,123 +958,111 @@ class DB:
     # ---------- SZCZEGÓŁOWY RAPORT CSV ----------
     def export_detailed_report_csv(self, path, date_from, date_to, 
                                  include_purchases=True, include_sales=True,
-                                 include_summary=True, include_products=False):
-        """Eksportuje szczegółowy raport do CSV"""
+                                 include_summary=True, include_products=False,
+                                 personal_data=None):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f, delimiter=";")
                 
-                # Nagłówek raportu
-                w.writerow([f"RAPORT OKRESOWY: {date_from} - {date_to}"])
+                w.writerow([f"EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ"])
+                w.writerow([f"Okres: {date_from} - {date_to}"])
                 w.writerow([f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
                 w.writerow([])
                 
-                # Podsumowanie finansowe
-                if include_summary:
-                    summary = self.report(date_from, date_to)
-                    if summary:
-                        w.writerow(["PODSUMOWANIE FINANSOWE"])
-                        w.writerow(["Sprzedaż PLN:", f"{summary['sales_pln'] or 0:.2f}"])
-                        w.writerow(["Sprzedaż EUR:", f"{summary['sales_eur'] or 0:.2f}"])
-                        w.writerow(["Koszty zakupu:", f"{summary['purchase_costs'] or 0:.2f}"])
-                        w.writerow(["Wszystkie koszty:", f"{summary['all_costs'] or 0:.2f}"])
-                        profit = (summary['sales_pln'] or 0) - (summary['all_costs'] or 0)
-                        w.writerow(["Zysk:", f"{profit:.2f}"])
-                        w.writerow([])
+                if personal_data:
+                    w.writerow(["DANE SPRZEDAWCY"])
+                    w.writerow([f"Imię i nazwisko: {personal_data.get('name', '')}"])
+                    w.writerow([f"Adres: {personal_data.get('address', '')}"])
+                    w.writerow([f"Kod pocztowy: {personal_data.get('postal_code', '')}"])
+                    w.writerow([f"Miejscowość: {personal_data.get('city', '')}"])
+                    w.writerow([f"PESEL: {personal_data.get('pesel', '')}"])
+                    if personal_data.get('nip'):
+                        w.writerow([f"NIP: {personal_data.get('nip', '')}"])
+                    if personal_data.get('regon'):
+                        w.writerow([f"REGON: {personal_data.get('regon', '')}"])
+                    w.writerow([])
                 
-                # Zakupy
-                if include_purchases:
-                    purchases = self.get_detailed_purchases(date_from, date_to)
-                    if purchases:
-                        w.writerow(["ZAKUPY"])
-                        w.writerow(["ID zamówienia", "Data", "SKU", "Nazwa produktu", "Ilość", 
-                                   "Koszt jednostkowy", "Wartość pozycji", "Wartość zamówienia"])
-                        total_purchase_value = 0
-                        current_order = None
-                        order_total = 0
-                        
-                        for p in purchases:
-                            if p['order_id'] != current_order:
-                                if current_order is not None:
-                                    w.writerow(["", "", "", "", "", "", f"SUMA ZAMÓWIENIA:", f"{order_total:.2f}"])
-                                    w.writerow([])
-                                current_order = p['order_id']
-                                order_total = 0
-                            
-                            w.writerow([
-                                p['order_id'], p['date'], p['sku'], p['title'], 
-                                p['qty'], f"{p['unit_cost']:.2f}", 
-                                f"{p['item_cost']:.2f}", f"{p['order_total']:.2f}"
-                            ])
-                            total_purchase_value += p['item_cost']
-                            order_total += p['item_cost']
-                        
-                        if current_order is not None:
-                            w.writerow(["", "", "", "", "", "", f"SUMA ZAMÓWIENIA:", f"{order_total:.2f}"])
-                        
-                        w.writerow(["", "", "", "", "", "", f"ŁĄCZNA WARTOŚĆ ZAKUPÓW:", f"{total_purchase_value:.2f}"])
-                        w.writerow([])
+                register_data = self.get_simple_sales_register_with_cumulative(date_from, date_to, personal_data or {})
                 
-                # Sprzedaż - POPRAWIONE: zysk = przychód - koszt
-                if include_sales:
-                    sales = self.get_detailed_sales(date_from, date_to)
-                    if sales:
-                        w.writerow(["SPRZEDAŻ"])
-                        w.writerow(["ID zamówienia", "Platforma", "Data", "SKU", "Nazwa produktu", 
-                                   "Ilość", "Przychód PLN", "Przychód EUR", "Koszt zakupu", 
-                                   "Zysk", "Wartość zamówienia PLN", "Wartość zamówienia EUR"])
-                        
-                        total_revenue_pln = 0
-                        total_revenue_eur = 0
-                        total_cost = 0
-                        total_profit = 0
-                        current_order = None
-                        order_total_pln = 0
-                        order_total_eur = 0
-                        
-                        for s in sales:
-                            if s['order_id'] != current_order:
-                                if current_order is not None:
-                                    w.writerow(["", "", "", "", "", "", "", "", "", 
-                                               f"SUMA ZAMÓWIENIA:", f"{order_total_pln:.2f}", f"{order_total_eur:.2f}"])
-                                    w.writerow([])
-                                current_order = s['order_id']
-                                order_total_pln = 0
-                                order_total_eur = 0
-                            
-                            w.writerow([
-                                s['order_id'], s['platform'], s['date'], s['sku'], s['title'], 
-                                s['qty'], f"{s['item_revenue_pln']:.2f}", f"{s['item_revenue_eur']:.2f}", 
-                                f"{s['item_cost']:.2f}", f"{s['item_profit']:.2f}",  # Zysk już obliczony w query
-                                f"{s['order_total_pln']:.2f}", f"{s['order_total_eur']:.2f}"
-                            ])
-                            
-                            total_revenue_pln += s['item_revenue_pln']
-                            total_revenue_eur += s['item_revenue_eur']
-                            total_cost += s['item_cost']
-                            total_profit += s['item_profit']
-                            order_total_pln += s['item_revenue_pln']
-                            order_total_eur += s['item_revenue_eur']
-                        
-                        if current_order is not None:
-                            w.writerow(["", "", "", "", "", "", "", "", "", 
-                                       f"SUMA ZAMÓWIENIA:", f"{order_total_pln:.2f}", f"{order_total_eur:.2f}"])
-                        
-                        w.writerow(["", "", "", "", "", "", 
-                                   f"ŁĄCZNY PRZYCHÓD PLN:", f"{total_revenue_pln:.2f}", 
-                                   f"ŁĄCZNY KOSZT:", f"{total_cost:.2f}", 
-                                   f"ŁĄCZNY ZYSK:", f"{total_profit:.2f}"])
-                        w.writerow([])
-                
-                # Lista produktów
-                if include_products:
-                    products = self.list_products()
-                    if products:
-                        w.writerow(["STAN MAGAZYNOWY"])
-                        w.writerow(["ID", "SKU", "Nazwa produktu", "Stan"])
-                        for p in products:
-                            w.writerow([p['id'], p['sku'], p['title'], p['stock']])
-                
+                if register_data and register_data["transakcje"]:
+                    w.writerow(["PODSUMOWANIE OGÓLNE OKRESU"])
+                    w.writerow(["Przychód całkowity:", f"{register_data['podsumowanie_ogolne']['przychod_calkowity']:.2f} PLN"])
+                    w.writerow(["Koszt całkowity:", f"{register_data['podsumowanie_ogolne']['koszt_calkowity']:.2f} PLN"])
+                    w.writerow(["Zysk całkowity:", f"{register_data['podsumowanie_ogolne']['zysk_calkowity']:.2f} PLN"])
+                    w.writerow(["Liczba transakcji (zamówień):", register_data['podsumowanie_ogolne']['liczba_transakcji']])
+                    w.writerow(["Liczba pozycji sprzedaży:", register_data['podsumowanie_ogolne']['liczba_pozycji']])
+                    w.writerow([])
+                    
+                    w.writerow(["PODSUMOWANIE MIESIĘCZNE (NARASTAJĄCO)"])
+                    w.writerow(["Miesiąc", "Przychód miesiąc", "Zysk miesiąc", "Liczba transakcji", "Liczba pozycji",
+                               "PRZYCHÓD NARASTAJĄCO", "ZYSK NARASTAJĄCO"])
+                    
+                    for month_data in register_data.get("podsumowanie_miesieczne_narastajaco", []):
+                        w.writerow([
+                            month_data['miesiac'],
+                            f"{month_data['przychod_miesiac']:.2f}",
+                            f"{month_data['zysk_miesiac']:.2f}",
+                            month_data['liczba_transakcji'],
+                            month_data.get('liczba_pozycji', 0),
+                            f"{month_data['przychod_narastajaco']:.2f}",
+                            f"{month_data['zysk_narastajaco']:.2f}"
+                        ])
+                    w.writerow([])
+                    
+                    w.writerow(["PODSUMOWANIE ROCZNE (NARASTAJĄCO)"])
+                    w.writerow(["Rok", "Przychód roczny", "Zysk roczny", "Liczba transakcji", "PRZYCHÓD NARASTAJĄCO"])
+                    
+                    for year_data in register_data.get("podsumowanie_roczne_narastajaco", []):
+                        w.writerow([
+                            year_data['rok'],
+                            f"{year_data['przychod_rok']:.2f}",
+                            f"{year_data['zysk_rok']:.2f}",
+                            year_data.get('liczba_transakcji', 0),
+                            f"{year_data['przychod_narastajaco']:.2f}"
+                        ])
+                    w.writerow([])
+                    
+                    w.writerow(["SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI"])
+                    w.writerow(["Data", "Platforma", "Produkt", "Ilość", "Cena jdn.", 
+                               "Wartość sprzedaży", "Koszt zakupu", "Zysk transakcji",
+                               "PRZYCHÓD NARASTAJĄCO", "KOSZT NARASTAJĄCO", "ZYSK NARASTAJĄCO"])
+                    
+                    for transaction in register_data["transakcje"]:
+                        w.writerow([
+                            transaction['data_sprzedazy'],
+                            transaction['platforma'],
+                            f"{transaction['kod_produktu']} - {transaction['nazwa_produktu']}",
+                            transaction['ilosc'],
+                            f"{transaction['cena_jednostkowa_pln']:.2f}",
+                            f"{transaction['wartosc_sprzedazy_pln']:.2f}",
+                            f"{transaction['koszt_zakupu']:.2f}",
+                            f"{transaction['zysk_brutto']:.2f}",
+                            f"{transaction['sprzedaz_narastajaca_pln']:.2f}",
+                            f"{transaction['sprzedaz_narastajaca_koszt']:.2f}",
+                            f"{transaction['sprzedaz_narastajaca_zysk']:.2f}"
+                        ])
+                    w.writerow([])
+                    
+                    minimal_wage = 4242
+                    limit = 0.75 * minimal_wage
+                    total_revenue = register_data['podsumowanie_ogolne']['przychod_calkowity']
+                    
+                    w.writerow([f"ANALIZA PROGU LIMITU ({date_from[:4]} r.)"])
+                    w.writerow([f"Minimalne wynagrodzenie: {minimal_wage} PLN"])
+                    w.writerow([f"75% minimalnego wynagrodzenia: {limit:.2f} PLN"])
+                    w.writerow([f"Przychód narastająco w roku {date_from[:4]}: {total_revenue:.2f} PLN"])
+                    
+                    if total_revenue > limit:
+                        w.writerow(["UWAGA: Przekroczono limit działalności nierejestrowanej!"])
+                        w.writerow(["Konieczna rejestracja działalności gospodarczej"])
+                    else:
+                        w.writerow(["OK: Przychód mieści się w limicie działalności nierejestrowanej"])
+                    
+                    w.writerow([])
+                else:
+                    w.writerow(["Brak danych sprzedaży w wybranym okresie"])
+                    w.writerow([])
+                    
             return True
         except Exception as e:
             print(f"Błąd w export_detailed_report_csv: {e}")
@@ -840,236 +1071,186 @@ class DB:
     # ---------- SZCZEGÓŁOWY RAPORT EXCEL ----------
     def export_detailed_report_excel(self, path, date_from, date_to,
                                    include_purchases=True, include_sales=True,
-                                   include_summary=True, include_products=False):
-        """Eksportuje szczegółowy raport do Excel (XLSX)"""
+                                   include_summary=True, include_products=False,
+                                   personal_data=None):
         if not HAS_EXCEL:
             raise ImportError("Biblioteka openpyxl nie jest zainstalowana. Użyj: pip install openpyxl")
         
         try:
             wb = openpyxl.Workbook()
             
-            # Stylowanie
             header_font = Font(bold=True, color="FFFFFF")
+            warning_font = Font(bold=True, color="FF0000")
+            cumulative_font = Font(bold=True, color="2E7D32")
+            
             header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+            cumulative_fill = PatternFill(start_color="E8F5E8", end_color="E8F5E8", fill_type="solid")
+            warning_fill = PatternFill(start_color="FFEBEE", end_color="FFEBEE", fill_type="solid")
+            
             header_alignment = Alignment(horizontal="center", vertical="center")
             
             money_format = '#,##0.00'
-            date_format = 'YYYY-MM-DD'
             
-            # Strona główna - informacje
-            ws = wb.active
-            ws.title = "Informacje"
+            register_data = self.get_simple_sales_register_with_cumulative(date_from, date_to, personal_data or {})
             
-            ws['A1'] = f"RAPORT OKRESOWY"
-            ws['A1'].font = Font(bold=True, size=14)
-            ws['A2'] = f"Okres: {date_from} - {date_to}"
-            ws['A3'] = f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            ws_summary = wb.active
+            ws_summary.title = "Podsumowanie"
             
-            # Podsumowanie finansowe
-            if include_summary:
-                ws['A5'] = "PODSUMOWANIE FINANSOWE"
-                ws['A5'].font = Font(bold=True)
+            row = 1
+            ws_summary.cell(row=row, column=1, value="EWIDENCJA SPRZEDAŻY DLA DZIAŁALNOŚCI NIEREJESTROWANEJ")
+            ws_summary.cell(row=row, column=1).font = Font(bold=True, size=14)
+            row += 2
+            
+            ws_summary.cell(row=row, column=1, value=f"Okres: {date_from} - {date_to}")
+            ws_summary.cell(row=row, column=1).font = Font(bold=True)
+            row += 1
+            
+            ws_summary.cell(row=row, column=1, value=f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            row += 2
+            
+            if personal_data:
+                ws_summary.cell(row=row, column=1, value="DANE SPRZEDAWCY").font = Font(bold=True)
+                row += 1
                 
-                summary = self.report(date_from, date_to)
-                if summary:
-                    data = [
-                        ["Sprzedaż PLN:", f"{summary['sales_pln'] or 0:.2f}"],
-                        ["Sprzedaż EUR:", f"{summary['sales_eur'] or 0:.2f}"],
-                        ["Koszty zakupu:", f"{summary['purchase_costs'] or 0:.2f}"],
-                        ["Wszystkie koszty:", f"{summary['all_costs'] or 0:.2f}"]
-                    ]
-                    
-                    profit = (summary['sales_pln'] or 0) - (summary['all_costs'] or 0)
-                    data.append(["Zysk:", f"{profit:.2f}"])
-                    
-                    for i, (label, value) in enumerate(data, start=6):
-                        ws[f'A{i}'] = label
-                        ws[f'B{i}'] = float(value.split()[0])
-                        ws[f'B{i}'].number_format = money_format
-                        ws[f'B{i}'].font = Font(bold=True) if "Zysk" in label else Font()
+                ws_summary.cell(row=row, column=1, value=f"Imię i nazwisko: {personal_data.get('name', '')}")
+                row += 1
+                ws_summary.cell(row=row, column=1, value=f"Adres: {personal_data.get('address', '')}")
+                row += 1
+                ws_summary.cell(row=row, column=1, value=f"Kod pocztowy: {personal_data.get('postal_code', '')}")
+                row += 1
+                ws_summary.cell(row=row, column=1, value=f"Miejscowość: {personal_data.get('city', '')}")
+                row += 1
+                ws_summary.cell(row=row, column=1, value=f"PESEL: {personal_data.get('pesel', '')}")
+                row += 1
                 
-                ws.column_dimensions['A'].width = 25
-                ws.column_dimensions['B'].width = 15
+                if personal_data.get('nip'):
+                    ws_summary.cell(row=row, column=1, value=f"NIP: {personal_data.get('nip', '')}")
+                    row += 1
+                if personal_data.get('regon'):
+                    ws_summary.cell(row=row, column=1, value=f"REGON: {personal_data.get('regon', '')}")
+                    row += 1
+                row += 1
             
-            # Zakupy
-            if include_purchases:
-                ws_purchases = wb.create_sheet("Zakupy")
-                purchases = self.get_detailed_purchases(date_from, date_to)
+            if register_data and register_data.get("transakcje"):
+                summary = register_data["podsumowanie_ogolne"]
                 
-                if purchases:
-                    headers = ["ID zamówienia", "Data", "SKU", "Nazwa produktu", 
-                              "Ilość", "Koszt jednostkowy", "Wartość pozycji", "Wartość zamówienia"]
-                    
-                    for col, header in enumerate(headers, start=1):
-                        cell = ws_purchases.cell(row=1, column=col, value=header)
-                        cell.font = header_font
-                        cell.fill = header_fill
-                        cell.alignment = header_alignment
-                    
-                    row = 2
-                    total_purchase_value = 0
-                    current_order = None
-                    order_total = 0
-                    
-                    for p in purchases:
-                        if p['order_id'] != current_order:
-                            if current_order is not None:
-                                # Dodaj sumę zamówienia
-                                ws_purchases.cell(row=row, column=6, value="SUMA ZAMÓWIENIA:").font = Font(bold=True)
-                                ws_purchases.cell(row=row, column=7, value=order_total).number_format = money_format
-                                ws_purchases.cell(row=row, column=7).font = Font(bold=True)
-                                row += 2
-                            
-                            current_order = p['order_id']
-                            order_total = 0
-                        
-                        ws_purchases.cell(row=row, column=1, value=p['order_id'])
-                        ws_purchases.cell(row=row, column=2, value=p['date'])
-                        ws_purchases.cell(row=row, column=3, value=p['sku'])
-                        ws_purchases.cell(row=row, column=4, value=p['title'])
-                        ws_purchases.cell(row=row, column=5, value=p['qty'])
-                        ws_purchases.cell(row=row, column=6, value=float(p['unit_cost'])).number_format = money_format
-                        ws_purchases.cell(row=row, column=7, value=float(p['item_cost'])).number_format = money_format
-                        ws_purchases.cell(row=row, column=8, value=float(p['order_total'])).number_format = money_format
-                        
-                        total_purchase_value += p['item_cost']
-                        order_total += p['item_cost']
-                        row += 1
-                    
-                    if current_order is not None:
-                        ws_purchases.cell(row=row, column=6, value="SUMA ZAMÓWIENIA:").font = Font(bold=True)
-                        ws_purchases.cell(row=row, column=7, value=order_total).number_format = money_format
-                        ws_purchases.cell(row=row, column=7).font = Font(bold=True)
-                        row += 2
-                    
-                    # Łączna wartość zakupów
-                    ws_purchases.cell(row=row, column=6, value="ŁĄCZNA WARTOŚĆ ZAKUPÓW:").font = Font(bold=True)
-                    ws_purchases.cell(row=row, column=7, value=total_purchase_value).number_format = money_format
-                    ws_purchases.cell(row=row, column=7).font = Font(bold=True, color="FF0000")
-                    
-                    # Ustaw szerokości kolumn
-                    for col in range(1, 9):
-                        ws_purchases.column_dimensions[get_column_letter(col)].width = 15
-            
-            # Sprzedaż - POPRAWIONE: zysk = przychód - koszt
-            if include_sales:
-                ws_sales = wb.create_sheet("Sprzedaż")
-                sales = self.get_detailed_sales(date_from, date_to)
+                ws_summary.cell(row=row, column=1, value="PODSUMOWANIE OGÓLNE OKRESU").font = Font(bold=True)
+                row += 1
                 
-                if sales:
-                    headers = ["ID zamówienia", "Platforma", "Data", "SKU", "Nazwa produktu", 
-                              "Ilość", "Przychód PLN", "Przychód EUR", "Koszt zakupu", "Zysk",
-                              "Wartość zamówienia PLN", "Wartość zamówienia EUR"]
-                    
-                    for col, header in enumerate(headers, start=1):
-                        cell = ws_sales.cell(row=1, column=col, value=header)
-                        cell.font = header_font
-                        cell.fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
-                        cell.alignment = header_alignment
-                    
-                    row = 2
-                    total_revenue_pln = 0
-                    total_revenue_eur = 0
-                    total_cost = 0
-                    total_profit = 0
-                    current_order = None
-                    order_total_pln = 0
-                    order_total_eur = 0
-                    
-                    for s in sales:
-                        if s['order_id'] != current_order:
-                            if current_order is not None:
-                                # Dodaj sumę zamówienia
-                                ws_sales.cell(row=row, column=9, value="SUMA ZAMÓWIENIA:").font = Font(bold=True)
-                                ws_sales.cell(row=row, column=10, value=order_total_pln).number_format = money_format
-                                ws_sales.cell(row=row, column=10).font = Font(bold=True)
-                                ws_sales.cell(row=row, column=11, value=order_total_eur).number_format = money_format
-                                ws_sales.cell(row=row, column=11).font = Font(bold=True)
-                                row += 2
-                            
-                            current_order = s['order_id']
-                            order_total_pln = 0
-                            order_total_eur = 0
-                        
-                        ws_sales.cell(row=row, column=1, value=s['order_id'])
-                        ws_sales.cell(row=row, column=2, value=s['platform'])
-                        ws_sales.cell(row=row, column=3, value=s['date'])
-                        ws_sales.cell(row=row, column=4, value=s['sku'])
-                        ws_sales.cell(row=row, column=5, value=s['title'])
-                        ws_sales.cell(row=row, column=6, value=s['qty'])
-                        ws_sales.cell(row=row, column=7, value=float(s['item_revenue_pln'])).number_format = money_format
-                        ws_sales.cell(row=row, column=8, value=float(s['item_revenue_eur'])).number_format = money_format
-                        ws_sales.cell(row=row, column=9, value=float(s['item_cost'])).number_format = money_format
-                        ws_sales.cell(row=row, column=10, value=float(s['item_profit'])).number_format = money_format  # Zysk
-                        ws_sales.cell(row=row, column=11, value=float(s['order_total_pln'])).number_format = money_format
-                        ws_sales.cell(row=row, column=12, value=float(s['order_total_eur'])).number_format = money_format
-                        
-                        total_revenue_pln += s['item_revenue_pln']
-                        total_revenue_eur += s['item_revenue_eur']
-                        total_cost += s['item_cost']
-                        total_profit += s['item_profit']
-                        order_total_pln += s['item_revenue_pln']
-                        order_total_eur += s['item_revenue_eur']
-                        row += 1
-                    
-                    if current_order is not None:
-                        ws_sales.cell(row=row, column=9, value="SUMA ZAMÓWIENIA:").font = Font(bold=True)
-                        ws_sales.cell(row=row, column=10, value=order_total_pln).number_format = money_format
-                        ws_sales.cell(row=row, column=10).font = Font(bold=True)
-                        ws_sales.cell(row=row, column=11, value=order_total_eur).number_format = money_format
-                        ws_sales.cell(row=row, column=11).font = Font(bold=True)
-                        row += 2
-                    
-                    # Podsumowanie
-                    ws_sales.cell(row=row, column=6, value="ŁĄCZNY PRZYCHÓD PLN:").font = Font(bold=True)
-                    ws_sales.cell(row=row, column=7, value=total_revenue_pln).number_format = money_format
-                    ws_sales.cell(row=row, column=7).font = Font(bold=True, color="2E7D32")
-                    
-                    ws_sales.cell(row=row, column=8, value="ŁĄCZNY PRZYCHÓD EUR:").font = Font(bold=True)
-                    ws_sales.cell(row=row, column=9, value=total_revenue_eur).number_format = money_format
-                    ws_sales.cell(row=row, column=9).font = Font(bold=True, color="2E7D32")
-                    
-                    ws_sales.cell(row=row+1, column=6, value="ŁĄCZNY KOSZT:").font = Font(bold=True)
-                    ws_sales.cell(row=row+1, column=7, value=total_cost).number_format = money_format
-                    ws_sales.cell(row=row+1, column=7).font = Font(bold=True, color="D32F2F")
-                    
-                    ws_sales.cell(row=row+1, column=8, value="ŁĄCZNY ZYSK:").font = Font(bold=True)
-                    ws_sales.cell(row=row+1, column=9, value=total_profit).number_format = money_format
-                    ws_sales.cell(row=row+1, column=9).font = Font(bold=True, color="2E7D32")
-                    
-                    # Ustaw szerokości kolumn
-                    for col in range(1, 13):
-                        ws_sales.column_dimensions[get_column_letter(col)].width = 15
-            
-            # Lista produktów
-            if include_products:
-                ws_products = wb.create_sheet("Magazyn")
-                products = self.list_products()
+                data = [
+                    ["Przychód całkowity:", f"{summary['przychod_calkowity']:.2f}"],
+                    ["Koszt całkowity:", f"{summary['koszt_calkowity']:.2f}"],
+                    ["Zysk całkowity:", f"{summary['zysk_calkowity']:.2f}"],
+                    ["Liczba transakcji (zamówień):", summary['liczba_transakcji']],
+                    ["Liczba pozycji sprzedaży:", summary['liczba_pozycji']]
+                ]
                 
-                if products:
-                    headers = ["ID", "SKU", "Nazwa produktu", "Stan"]
+                for i, (label, value) in enumerate(data):
+                    ws_summary.cell(row=row, column=1, value=label)
+                    if i < 3:
+                        ws_summary.cell(row=row, column=2, value=float(value.split()[0]))
+                        ws_summary.cell(row=row, column=2).number_format = money_format
+                        ws_summary.cell(row=row, column=2).font = Font(bold=True)
+                    else:
+                        ws_summary.cell(row=row, column=2, value=int(value))
+                    row += 1
+                
+                row += 1
+                
+                ws_monthly = wb.create_sheet("Podsumowanie miesięczne")
+                ws_monthly.cell(row=1, column=1, value="PODSUMOWANIE MIESIĘCZNE (NARASTAJĄCO)").font = Font(bold=True, size=12)
+                
+                headers = ["Miesiąc", "Przychód miesiąc", "Zysk miesiąc", "Liczba transakcji", "Liczba pozycji",
+                          "PRZYCHÓD NARASTAJĄCO", "ZYSK NARASTAJĄCO"]
+                
+                for col, header in enumerate(headers, start=1):
+                    cell = ws_monthly.cell(row=3, column=col, value=header)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = header_alignment
+                
+                row_monthly = 4
+                for month_data in register_data.get("podsumowanie_miesieczne_narastajaco", []):
+                    ws_monthly.cell(row=row_monthly, column=1, value=month_data['miesiac'])
+                    ws_monthly.cell(row=row_monthly, column=2, value=month_data['przychod_miesiac']).number_format = money_format
+                    ws_monthly.cell(row=row_monthly, column=3, value=month_data['zysk_miesiac']).number_format = money_format
+                    ws_monthly.cell(row=row_monthly, column=4, value=month_data['liczba_transakcji'])
+                    ws_monthly.cell(row=row_monthly, column=5, value=month_data.get('liczba_pozycji', 0))
+                    ws_monthly.cell(row=row_monthly, column=6, value=month_data['przychod_narastajaco']).number_format = money_format
+                    ws_monthly.cell(row=row_monthly, column=6).font = cumulative_font
+                    ws_monthly.cell(row=row_monthly, column=6).fill = cumulative_fill
+                    ws_monthly.cell(row=row_monthly, column=7, value=month_data['zysk_narastajaco']).number_format = money_format
+                    ws_monthly.cell(row=row_monthly, column=7).font = cumulative_font
+                    row_monthly += 1
+                
+                ws_details = wb.create_sheet("Transakcje")
+                ws_details.cell(row=1, column=1, value="SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI Z NARASTANIEM").font = Font(bold=True, size=12)
+                
+                detail_headers = ["Data", "Platforma", "Produkt", "Ilość", "Cena jdn.", 
+                                "Wartość sprzedaży", "Koszt zakupu", "Zysk transakcji",
+                                "PRZYCHÓD NARASTAJĄCO", "KOSZT NARASTAJĄCO", "ZYSK NARASTAJĄCO"]
+                
+                for col, header in enumerate(detail_headers, start=1):
+                    cell = ws_details.cell(row=3, column=col, value=header)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = header_alignment
+                
+                row_detail = 4
+                for transaction in register_data["transakcje"]:
+                    ws_details.cell(row=row_detail, column=1, value=transaction['data_sprzedazy'])
+                    ws_details.cell(row=row_detail, column=2, value=transaction['platforma'])
+                    ws_details.cell(row=row_detail, column=3, value=f"{transaction['kod_produktu']} - {transaction['nazwa_produktu']}")
+                    ws_details.cell(row=row_detail, column=4, value=transaction['ilosc'])
+                    ws_details.cell(row=row_detail, column=5, value=transaction['cena_jednostkowa_pln']).number_format = money_format
+                    ws_details.cell(row=row_detail, column=6, value=transaction['wartosc_sprzedazy_pln']).number_format = money_format
+                    ws_details.cell(row=row_detail, column=7, value=transaction['koszt_zakupu']).number_format = money_format
+                    ws_details.cell(row=row_detail, column=8, value=transaction['zysk_brutto']).number_format = money_format
                     
-                    for col, header in enumerate(headers, start=1):
-                        cell = ws_products.cell(row=1, column=col, value=header)
-                        cell.font = header_font
-                        cell.fill = PatternFill(start_color="6A1B9A", end_color="6A1B9A", fill_type="solid")
-                        cell.alignment = header_alignment
+                    for col_offset, key in enumerate(['sprzedaz_narastajaca_pln', 'sprzedaz_narastajaca_koszt', 'sprzedaz_narastajaca_zysk'], start=9):
+                        ws_details.cell(row=row_detail, column=col_offset, value=transaction[key]).number_format = money_format
+                        ws_details.cell(row=row_detail, column=col_offset).font = Font(bold=True)
+                        ws_details.cell(row=row_detail, column=col_offset).fill = cumulative_fill
                     
-                    row = 2
-                    for p in products:
-                        ws_products.cell(row=row, column=1, value=p['id'])
-                        ws_products.cell(row=row, column=2, value=p['sku'])
-                        ws_products.cell(row=row, column=3, value=p['title'])
-                        ws_products.cell(row=row, column=4, value=p['stock'])
-                        row += 1
-                    
-                    # Ustaw szerokości kolumn
-                    ws_products.column_dimensions['A'].width = 10
-                    ws_products.column_dimensions['B'].width = 15
-                    ws_products.column_dimensions['C'].width = 30
-                    ws_products.column_dimensions['D'].width = 10
+                    row_detail += 1
+                
+                ws_analysis = wb.create_sheet("Analiza progu US")
+                ws_analysis.cell(row=1, column=1, value="ANALIZA PROGU LIMITU DLA US").font = Font(bold=True, size=14, color="FF0000")
+                
+                minimal_wage = 4242
+                limit = 0.75 * minimal_wage
+                total_revenue = register_data['podsumowanie_ogolne']['przychod_calkowity']
+                
+                analysis_data = [
+                    ["Parametr", "Wartość"],
+                    ["Minimalne wynagrodzenie", f"{minimal_wage} PLN"],
+                    ["75% minimalnego wynagrodzenia (limit)", f"{limit:.2f} PLN"],
+                    ["Przychód narastająco", f"{total_revenue:.2f} PLN"],
+                    ["", ""],
+                    ["ANALIZA:", ""]
+                ]
+                
+                row_analysis = 3
+                for label, value in analysis_data:
+                    ws_analysis.cell(row=row_analysis, column=1, value=label)
+                    ws_analysis.cell(row=row_analysis, column=2, value=value)
+                    row_analysis += 1
+                
+                if total_revenue > limit:
+                    ws_analysis.cell(row=row_analysis, column=1, value="UWAGA: PRZEKROCZONO LIMIT!")
+                    ws_analysis.cell(row=row_analysis, column=1).font = warning_font
+                    ws_analysis.cell(row=row_analysis, column=1).fill = warning_fill
+                    ws_analysis.cell(row=row_analysis, column=2, value="Konieczna rejestracja działalności gospodarczej")
+                    ws_analysis.cell(row=row_analysis, column=2).font = warning_font
+                else:
+                    ws_analysis.cell(row=row_analysis, column=1, value="OK: W LIMICIE")
+                    ws_analysis.cell(row=row_analysis, column=1).font = cumulative_font
+                    ws_analysis.cell(row=row_analysis, column=2, value="Działalność nierejestrowana może być kontynuowana")
+                
+                for ws in [ws_summary, ws_monthly, ws_details, ws_analysis]:
+                    for col in range(1, 20):
+                        ws.column_dimensions[get_column_letter(col)].width = 15
             
-            # Zapisz plik
             wb.save(path)
             return True
             
