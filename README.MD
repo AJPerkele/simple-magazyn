@@ -9,6 +9,8 @@
 
 **Kompletny system do zarządzania magazynem, sprzedażą i ewidencji dla działalności nierejestrowanej**
 
+![screenshot](https://github.com/AJPerkele/simple-magazyn/blob/main/main.png)
+
 </div>
 
 ---
