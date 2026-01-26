@@ -753,6 +753,7 @@ class DB:
         try:
             rows = self.conn.execute("""
                 SELECT
+                    o.id as order_id,
                     o.date as data_sprzedazy,
                     o.platform as platforma,
                     pr.sku as kod_produktu,
@@ -762,7 +763,7 @@ class DB:
                         SELECT SUM(qty) 
                         FROM sales_items 
                         WHERE order_id = o.id
-                    ) * si.qty, 2) as cena_jednostkowa_pln,
+                    ) * si.qty, 2) as cena_sprzedazy,
                     ROUND(o.total_pln / (
                         SELECT SUM(qty) 
                         FROM sales_items 
@@ -782,8 +783,7 @@ class DB:
                         SELECT SUM(qty) 
                         FROM sales_items 
                         WHERE order_id = o.id
-                    ) * si.qty, 2)) as zysk_brutto,
-                    o.id as numer_dokumentu
+                    ) * si.qty, 2)) as zysk_brutto
                 FROM sales_orders o
                 JOIN sales_items si ON si.order_id = o.id
                 JOIN products pr ON pr.id = si.product_id
@@ -816,16 +816,16 @@ class DB:
             
             for r in rows:
                 transaction = {
+                    'order_id': r['order_id'],
                     'data_sprzedazy': r['data_sprzedazy'],
                     'platforma': r['platforma'],
                     'kod_produktu': r['kod_produktu'],
                     'nazwa_produktu': r['nazwa_produktu'],
                     'ilosc': r['ilosc'],
-                    'cena_jednostkowa_pln': r['cena_jednostkowa_pln'],
+                    'cena_sprzedazy': r['cena_sprzedazy'],
                     'wartosc_sprzedazy_pln': r['wartosc_sprzedazy_pln'],
                     'koszt_zakupu': r['koszt_zakupu'],
                     'zysk_brutto': r['zysk_brutto'],
-                    'numer_dokumentu': r['numer_dokumentu'],
                     'sprzedaz_narastajaca_pln': 0,
                     'sprzedaz_narastajaca_koszt': 0,
                     'sprzedaz_narastajaca_zysk': 0
@@ -854,10 +854,10 @@ class DB:
                 monthly_summary[year_month]['przychod'] += r['wartosc_sprzedazy_pln']
                 monthly_summary[year_month]['koszt'] += r['koszt_zakupu']
                 monthly_summary[year_month]['zysk'] += r['zysk_brutto']
-                monthly_summary[year_month]['unikalne_zamowienia'].add(r['numer_dokumentu'])
+                monthly_summary[year_month]['unikalne_zamowienia'].add(r['order_id'])
                 monthly_summary[year_month]['liczba_pozycji'] += 1
                 
-                unique_order_ids.add(r['numer_dokumentu'])
+                unique_order_ids.add(r['order_id'])
             
             # Przelicz liczbę transakcji na podstawie unikalnych zamówień
             for month_data in monthly_summary.values():
@@ -1033,8 +1033,8 @@ class DB:
                     w.writerow([])
                     
                     w.writerow(["SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI"])
-                    w.writerow(["Data", "Platforma", "Produkt", "Ilość", "Cena jdn.", 
-                               "Wartość sprzedaży", "Koszt zakupu", "Zysk transakcji",
+                    w.writerow(["Data", "Platforma", "Produkt", "Ilość", "Cena sprzedaży", 
+                               "Wartość sprzedaży", "Koszt zakupu", "Zysk",
                                "PRZYCHÓD NARASTAJĄCO", "KOSZT NARASTAJĄCO", "ZYSK NARASTAJĄCO"])
                     
                     for transaction in register_data["transakcje"]:
@@ -1044,7 +1044,7 @@ class DB:
                             transaction['platforma'],
                             product_display,
                             transaction['ilosc'],
-                            f"{transaction['cena_jednostkowa_pln']:.2f}",
+                            f"{transaction['cena_sprzedazy']:.2f}",
                             f"{transaction['wartosc_sprzedazy_pln']:.2f}",
                             f"{transaction['koszt_zakupu']:.2f}",
                             f"{transaction['zysk_brutto']:.2f}",
@@ -1230,8 +1230,8 @@ class DB:
                 ws_details = wb.create_sheet("Transakcje")
                 ws_details.cell(row=1, column=1, value="SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI Z NARASTANIEM").font = Font(bold=True, size=12)
                 
-                detail_headers = ["Data", "Platforma", "Produkt", "Ilość", "Cena jdn.", 
-                                "Wartość sprzedaży", "Koszt zakupu", "Zysk transakcji",
+                detail_headers = ["Data", "Platforma", "Produkt", "Ilość", "Cena sprzedaży", 
+                                "Wartość sprzedaży", "Koszt zakupu", "Zysk",
                                 "PRZYCHÓD NARASTAJĄCO", "KOSZT NARASTAJĄCO", "ZYSK NARASTAJĄCO"]
                 
                 for col, header in enumerate(detail_headers, start=1):
@@ -1247,7 +1247,7 @@ class DB:
                     product_display = f"{transaction['nazwa_produktu']} ({transaction['kod_produktu']})"
                     ws_details.cell(row=row_detail, column=3, value=product_display)
                     ws_details.cell(row=row_detail, column=4, value=transaction['ilosc'])
-                    ws_details.cell(row=row_detail, column=5, value=transaction['cena_jednostkowa_pln']).number_format = money_format
+                    ws_details.cell(row=row_detail, column=5, value=transaction['cena_sprzedazy']).number_format = money_format
                     ws_details.cell(row=row_detail, column=6, value=transaction['wartosc_sprzedazy_pln']).number_format = money_format
                     ws_details.cell(row=row_detail, column=7, value=transaction['koszt_zakupu']).number_format = money_format
                     ws_details.cell(row=row_detail, column=8, value=transaction['zysk_brutto']).number_format = money_format

@@ -631,185 +631,6 @@ class LimitsConfigDialog(QDialog):
         QMessageBox.information(self, "Sukces", "Konfiguracja limitów została zapisana.")
         self.accept()
 
-# ================== DIALOG KONFIGURACJI RACHUNKÓW ==================
-class InvoiceConfigDialog(QDialog):
-    def __init__(self, config, parent=None):
-        super().__init__(parent)
-        self.config = config
-        self.setWindowTitle("Konfiguracja rachunków")
-        self.resize(500, 400)
-        
-        v = QVBoxLayout(self)
-        
-        # Grupa: Numeracja
-        gb_numbering = QGroupBox("Numeracja rachunków")
-        numbering_layout = QFormLayout()
-        
-        self.prefix_input = QLineEdit()
-        self.prefix_input.setPlaceholderText("np. FS, INV, RACH")
-        
-        self.start_number = QSpinBox()
-        self.start_number.setRange(1, 999999)
-        self.start_number.setValue(1)
-        
-        self.digits_input = QSpinBox()
-        self.digits_input.setRange(1, 8)
-        self.digits_input.setValue(6)
-        self.digits_input.setSuffix(" cyfr")
-        
-        numbering_layout.addRow("Prefiks:", self.prefix_input)
-        numbering_layout.addRow("Rozpocznij od:", self.start_number)
-        numbering_layout.addRow("Ilość cyfr:", self.digits_input)
-        
-        gb_numbering.setLayout(numbering_layout)
-        v.addWidget(gb_numbering)
-        
-        # Grupa: Wygląd
-        gb_appearance = QGroupBox("Wygląd rachunku")
-        appearance_layout = QFormLayout()
-        
-        self.company_name = QLineEdit()
-        self.company_name.setPlaceholderText("Nazwa firmy (opcjonalnie)")
-        
-        self.company_address = QLineEdit()
-        self.company_address.setPlaceholderText("Adres firmy (opcjonalnie)")
-        
-        self.phone_input = QLineEdit()
-        self.phone_input.setPlaceholderText("Telefon kontaktowy")
-        
-        self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("Email kontaktowy")
-        
-        self.footer_text = QTextEdit()
-        self.footer_text.setMaximumHeight(80)
-        self.footer_text.setPlaceholderText("Tekst stopki rachunku...")
-        
-        appearance_layout.addRow("Nazwa firmy:", self.company_name)
-        appearance_layout.addRow("Adres firmy:", self.company_address)
-        appearance_layout.addRow("Telefon:", self.phone_input)
-        appearance_layout.addRow("Email:", self.email_input)
-        appearance_layout.addRow("Stopka:", self.footer_text)
-        
-        gb_appearance.setLayout(appearance_layout)
-        v.addWidget(gb_appearance)
-        
-        # Grupa: Ustawienia dodatkowe
-        gb_advanced = QGroupBox("Ustawienia zaawansowane")
-        advanced_layout = QVBoxLayout()
-        
-        self.auto_open_cb = QCheckBox("Automatycznie otwieraj wygenerowany rachunek")
-        self.auto_open_cb.setChecked(True)
-        
-        self.save_pdf_cb = QCheckBox("Zapisuj kopię PDF w folderze rachunki/")
-        self.save_pdf_cb.setChecked(True)
-        
-        self.include_logo_cb = QCheckBox("Dołącz logo firmy (jeśli dostępne)")
-        self.include_logo_cb.setChecked(False)
-        
-        advanced_layout.addWidget(self.auto_open_cb)
-        advanced_layout.addWidget(self.save_pdf_cb)
-        advanced_layout.addWidget(self.include_logo_cb)
-        advanced_layout.addStretch()
-        
-        gb_advanced.setLayout(advanced_layout)
-        v.addWidget(gb_advanced)
-        
-        # Przyciski
-        button_layout = QHBoxLayout()
-        
-        btn_save = QPushButton("Zapisz konfigurację")
-        btn_save.clicked.connect(self.save_config)
-        btn_save.setStyleSheet("background-color: #2E7D32; font-weight: bold;")
-        
-        btn_cancel = QPushButton("Anuluj")
-        btn_cancel.clicked.connect(self.reject)
-        
-        btn_reset = QPushButton("Przywróć domyślne")
-        btn_reset.clicked.connect(self.reset_to_default)
-        
-        button_layout.addWidget(btn_save)
-        button_layout.addWidget(btn_reset)
-        button_layout.addWidget(btn_cancel)
-        
-        v.addLayout(button_layout)
-        
-        self.load_current_config()
-    
-    def load_current_config(self):
-        """Wczytuje aktualną konfigurację"""
-        config_data = self.config.load()
-        
-        # Numeracja
-        invoice_config = config_data.get("invoice", {})
-        self.prefix_input.setText(invoice_config.get("prefix", "FS"))
-        self.start_number.setValue(invoice_config.get("next_number", 1))
-        
-        # Wygląd
-        business_info = config_data.get("business", {})
-        self.company_name.setText(business_info.get("company_name", ""))
-        self.company_address.setText(business_info.get("company_address", ""))
-        self.phone_input.setText(business_info.get("phone", ""))
-        self.email_input.setText(business_info.get("email", ""))
-        self.footer_text.setText(invoice_config.get("footer_text", "Dziękujemy za zakupy!"))
-        
-        # Ustawienia zaawansowane
-        self.auto_open_cb.setChecked(invoice_config.get("auto_open", True))
-        self.save_pdf_cb.setChecked(invoice_config.get("save_pdf", True))
-        self.include_logo_cb.setChecked(invoice_config.get("include_logo", False))
-        
-        # Ilość cyfr (domyślnie 6)
-        self.digits_input.setValue(invoice_config.get("digits", 6))
-    
-    def save_config(self):
-        """Zapisuje konfigurację"""
-        config_data = self.config.load()
-        
-        # Numeracja
-        config_data.setdefault("invoice", {})
-        config_data["invoice"]["prefix"] = self.prefix_input.text().strip() or "FS"
-        config_data["invoice"]["next_number"] = self.start_number.value()
-        config_data["invoice"]["digits"] = self.digits_input.value()
-        config_data["invoice"]["footer_text"] = self.footer_text.toPlainText().strip() or "Dziękujemy za zakupy!"
-        config_data["invoice"]["auto_open"] = self.auto_open_cb.isChecked()
-        config_data["invoice"]["save_pdf"] = self.save_pdf_cb.isChecked()
-        config_data["invoice"]["include_logo"] = self.include_logo_cb.isChecked()
-        
-        # Informacje o firmie
-        config_data.setdefault("business", {})
-        config_data["business"]["company_name"] = self.company_name.text().strip()
-        config_data["business"]["company_address"] = self.company_address.text().strip()
-        config_data["business"]["phone"] = self.phone_input.text().strip()
-        config_data["business"]["email"] = self.email_input.text().strip()
-        
-        # Zapisz
-        self.config.data = config_data
-        self.config.save()
-        
-        QMessageBox.information(self, "Sukces", "Konfiguracja rachunków została zapisana.")
-        self.accept()
-    
-    def reset_to_default(self):
-        """Przywraca domyślne ustawienia"""
-        reply = QMessageBox.question(
-            self, "Przywróć domyślne",
-            "Czy na pewno chcesz przywrócić domyślne ustawienia rachunków?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            # Resetuj pola do domyślnych wartości
-            self.prefix_input.setText("FS")
-            self.start_number.setValue(1)
-            self.digits_input.setValue(6)
-            self.company_name.clear()
-            self.company_address.clear()
-            self.phone_input.clear()
-            self.email_input.clear()
-            self.footer_text.setText("Dziękujemy za zakupy!")
-            self.auto_open_cb.setChecked(True)
-            self.save_pdf_cb.setChecked(True)
-            self.include_logo_cb.setChecked(False)
-
 # ================== DIALOG RAPORTU (z drukowaniem) ==================
 class ReportDialog(QDialog):
     def __init__(self, db, config, parent=None, report_type="monthly"):
@@ -827,7 +648,7 @@ class ReportDialog(QDialog):
         else:
             self.setWindowTitle("Generuj raport okresowy")
             
-        self.resize(500, 600)
+        self.resize(600, 650)
 
         v = QVBoxLayout(self)
 
@@ -946,30 +767,37 @@ class ReportDialog(QDialog):
         gb_format.setLayout(format_layout)
         v.addWidget(gb_format)
 
-        # Szczegółowość
-        gb_detail = QGroupBox("Szczegółowość")
-        detail_layout = QVBoxLayout()
+        # Opcje raportu
+        gb_options = QGroupBox("Opcje raportu")
+        options_layout = QVBoxLayout()
+        
+        self.cb_consolidate_sales = QCheckBox("Łącz pozycje w ramach jednej sprzedaży (zalecane)")
+        self.cb_consolidate_sales.setChecked(True)
+        self.cb_consolidate_sales.setToolTip("Łączy wszystkie produkty z jednej sprzedaży w jedną pozycję")
+        
+        self.cb_show_products = QCheckBox("Pokazuj listę produktów w sprzedaży")
+        self.cb_show_products.setChecked(True)
         
         self.cb_purchases = QCheckBox("Uwzględnij zakupy")
-        self.cb_purchases.setChecked(True)
+        self.cb_purchases.setChecked(False)
         self.cb_sales = QCheckBox("Uwzględnij sprzedaż")
         self.cb_sales.setChecked(True)
         self.cb_summary = QCheckBox("Podsumowanie finansowe")
         self.cb_summary.setChecked(True)
-        self.cb_products = QCheckBox("Lista produktów ze stanem")
-        self.cb_products.setChecked(False)
         
         self.cb_simple_register = QCheckBox("Uproszczony rejestr sprzedaży z danymi osobowymi")
         self.cb_simple_register.setChecked(False)
-        self.cb_simple_register.setToolTip("Wymagane pola dla uproszczonego rozliczenia")
+        self.cb_simple_register.setToolTip("Generuje raport z limitami US i danymi osobowymi")
         
-        detail_layout.addWidget(self.cb_purchases)
-        detail_layout.addWidget(self.cb_sales)
-        detail_layout.addWidget(self.cb_summary)
-        detail_layout.addWidget(self.cb_products)
-        detail_layout.addWidget(self.cb_simple_register)
-        gb_detail.setLayout(detail_layout)
-        v.addWidget(gb_detail)
+        options_layout.addWidget(self.cb_consolidate_sales)
+        options_layout.addWidget(self.cb_show_products)
+        options_layout.addWidget(self.cb_purchases)
+        options_layout.addWidget(self.cb_sales)
+        options_layout.addWidget(self.cb_summary)
+        options_layout.addWidget(self.cb_simple_register)
+        
+        gb_options.setLayout(options_layout)
+        v.addWidget(gb_options)
 
         # Przyciski
         button_layout = QHBoxLayout()
@@ -1058,6 +886,79 @@ class ReportDialog(QDialog):
             return f"{quarter_names[quarter]} {year}"
         return None
 
+    def get_consolidated_sales_data(self, date_from, date_to):
+        """Pobiera i łączy dane sprzedaży w ramach jednego zamówienia"""
+        try:
+            # Pobierz szczegółowe dane sprzedaży
+            detailed_sales = self.db.get_detailed_sales(date_from, date_to)
+            if not detailed_sales:
+                return []
+            
+            # Grupuj po order_id
+            orders_dict = {}
+            for sale in detailed_sales:
+                order_id = sale['order_id']
+                if order_id not in orders_dict:
+                    orders_dict[order_id] = {
+                        'order_id': order_id,
+                        'platform': sale['platform'],
+                        'date': sale['date'],
+                        'total_pln': sale['order_total_pln'],
+                        'total_eur': sale['order_total_eur'],
+                        'total_cost': sale['order_total_cost'],
+                        'total_profit': sale['order_total_pln'] - sale['order_total_cost'],
+                        'products': [],
+                        'quantities': [],
+                        'revenue_items': [],
+                        'cost_items': [],
+                        'profit_items': []
+                    }
+                
+                # Dodaj produkt do listy - SKRÓCONA NAZWA DLA WYŚWIETLANIA
+                product_info = f"{sale['sku']} - {sale['title']} (x{sale['qty']})"
+                orders_dict[order_id]['products'].append(product_info)
+                orders_dict[order_id]['quantities'].append(sale['qty'])
+                orders_dict[order_id]['revenue_items'].append(sale['item_revenue_pln'])
+                orders_dict[order_id]['cost_items'].append(sale['item_cost'])
+                orders_dict[order_id]['profit_items'].append(sale['item_profit'])
+            
+            # Przekształć do listy
+            consolidated_sales = []
+            for order_data in orders_dict.values():
+                # Oblicz łączną ilość
+                total_qty = sum(order_data['quantities'])
+                
+                # Przelicz na rzeczywiste wartości (suma kosztów, nie średnia)
+                actual_total_cost = sum(order_data['cost_items'])
+                
+                # Tworzymy listę produktów w formacie poziomym (oddzielone przecinkami)
+                # UMIARKOWANE OGRANICZENIE DŁUGOŚCI - 150 ZNAKÓW
+                products_horizontal = ", ".join(order_data['products'])
+                if len(products_horizontal) > 150:
+                    products_horizontal = products_horizontal[:147] + "..."
+                
+                consolidated_sales.append({
+                    'order_id': order_data['order_id'],
+                    'date': order_data['date'],
+                    'platform': order_data['platform'],
+                    'products_list': order_data['products'],
+                    'products_horizontal': products_horizontal,
+                    'total_quantity': total_qty,
+                    'revenue_pln': order_data['total_pln'],
+                    'cost_pln': actual_total_cost,
+                    'profit_pln': order_data['total_pln'] - actual_total_cost,
+                    'revenue_per_item': order_data['total_pln'] / total_qty if total_qty > 0 else 0,
+                    'products_display': products_horizontal if self.cb_show_products.isChecked() else f"{len(order_data['products'])} produktów"
+                })
+            
+            return consolidated_sales
+            
+        except Exception as e:
+            print(f"Błąd w get_consolidated_sales_data: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
     def print_report(self):
         """Bezpośrednie drukowanie raportu"""
         try:
@@ -1071,7 +972,7 @@ class ReportDialog(QDialog):
                 return
             
             date_from, date_to = self.get_date_range()
-            personal_data = self.config.get_business_info()
+            personal_data = self.config.get_business_info() if self.cb_simple_register.isChecked() else {}
             
             if self.cb_simple_register.isChecked():
                 required_fields = ['name', 'address', 'postal_code', 'city', 'pesel']
@@ -1082,13 +983,19 @@ class ReportDialog(QDialog):
                                       f"Uzupełnij dane osobowe w konfiguracji.\nBrakujące pola: {', '.join(missing_fields)}")
                     return
             
-            register_data = self.db.get_simple_sales_register_with_cumulative(date_from, date_to, personal_data or {})
+            # Pobierz dane sprzedaży
+            if self.cb_consolidate_sales.isChecked():
+                sales_data = self.get_consolidated_sales_data(date_from, date_to)
+                register_data = None
+            else:
+                register_data = self.db.get_simple_sales_register_with_cumulative(date_from, date_to, personal_data or {})
+                sales_data = None
             
-            if not register_data or not register_data.get("transakcje"):
+            if not sales_data and (not register_data or not register_data.get("transakcje")):
                 QMessageBox.warning(self, "Brak danych", "Brak danych do wydrukowania w wybranym okresie.")
                 return
             
-            html_content = self.generate_print_html(date_from, date_to, register_data)
+            html_content = self.generate_print_html(date_from, date_to, sales_data, register_data, personal_data)
             
             print_dialog = QPrintDialog(printer, self)
             print_dialog.setWindowTitle("Drukuj raport")
@@ -1108,7 +1015,7 @@ class ReportDialog(QDialog):
             QMessageBox.critical(self, "Błąd drukowania", 
                                f"Wystąpił błąd podczas drukowania:\n{str(e)}")
 
-    def generate_print_html(self, date_from, date_to, register_data):
+    def generate_print_html(self, date_from, date_to, sales_data=None, register_data=None, personal_data=None):
         """Generuje HTML do drukowania z uwzględnieniem limitów kwartalnych"""
         try:
             # Tytuł raportu
@@ -1125,53 +1032,66 @@ class ReportDialog(QDialog):
             else:
                 title = f"Raport okresowy - {date_from} do {date_to}"
             
-            # Dane sprzedawcy
-            personal_data = self.config.get_business_info()
+            # Dane sprzedawcy - tylko jeśli zaznaczono uproszczony rejestr
             seller_info = ""
-            if personal_data.get('name'):
+            if self.cb_simple_register.isChecked() and personal_data and personal_data.get('name'):
                 seller_info = f"""
-                <div style="margin-bottom: 20px;">
-                    <h3>Dane sprzedawcy:</h3>
-                    <p><b>Imię i nazwisko:</b> {personal_data.get('name', '')}</p>
-                    <p><b>Adres:</b> {personal_data.get('address', '')}</p>
-                    <p><b>Kod pocztowy i miejscowość:</b> {personal_data.get('postal_code', '')} {personal_data.get('city', '')}</p>
-                    <p><b>PESEL:</b> {personal_data.get('pesel', '')}</p>
-                    {"<p><b>NIP:</b> " + personal_data.get('nip', '') + "</p>" if personal_data.get('nip') else ""}
-                    {"<p><b>REGON:</b> " + personal_data.get('regon', '') + "</p>" if personal_data.get('regon') else ""}
+                <div style="margin-bottom: 12px;">
+                    <h3 style="font-size: 11px; margin-bottom: 4px;">Dane sprzedawcy:</h3>
+                    <p style="font-size: 9px; margin: 1px 0;"><b>Imię i nazwisko:</b> {personal_data.get('name', '')}</p>
+                    <p style="font-size: 9px; margin: 1px 0;"><b>Adres:</b> {personal_data.get('address', '')}</p>
+                    <p style="font-size: 9px; margin: 1px 0;"><b>Kod pocztowy i miejscowość:</b> {personal_data.get('postal_code', '')} {personal_data.get('city', '')}</p>
+                    <p style="font-size: 9px; margin: 1px 0;"><b>PESEL:</b> {personal_data.get('pesel', '')}</p>
+                    {"<p style='font-size: 9px; margin: 1px 0;'><b>NIP:</b> " + personal_data.get('nip', '') + "</p>" if personal_data.get('nip') else ""}
+                    {"<p style='font-size: 9px; margin: 1px 0;'><b>REGON:</b> " + personal_data.get('regon', '') + "</p>" if personal_data.get('regon') else ""}
                 </div>
                 """
             
+            # Oblicz podsumowanie
+            total_revenue = 0
+            total_cost = 0
+            total_profit = 0
+            total_transactions = 0
+            
+            if sales_data:
+                total_transactions = len(sales_data)
+                for sale in sales_data:
+                    total_revenue += sale['revenue_pln']
+                    total_cost += sale['cost_pln']
+                    total_profit += sale['profit_pln']
+            elif register_data and register_data.get("transakcje"):
+                summary = register_data["podsumowanie_ogolne"]
+                total_revenue = summary['przychod_calkowity']
+                total_cost = summary['koszt_calkowity']
+                total_profit = summary['zysk_calkowity']
+                total_transactions = summary['liczba_transakcji']
+            
             # Podsumowanie ogólne
-            summary = register_data["podsumowanie_ogolne"]
             summary_html = f"""
-            <div style="margin-bottom: 20px;">
-                <h3>Podsumowanie ogólne:</h3>
-                <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%;">
+            <div style="margin-bottom: 12px;">
+                <h3 style="font-size: 11px; margin-bottom: 4px;">Podsumowanie ogólne:</h3>
+                <table border="1" cellpadding="3" style="border-collapse: collapse; width: 100%; font-size: 9px;">
                     <tr>
                         <td><b>Przychód całkowity:</b></td>
-                        <td align="right">{summary['przychod_calkowity']:.2f} PLN</td>
+                        <td align="right">{total_revenue:.2f} PLN</td>
                     </tr>
                     <tr>
                         <td><b>Koszt całkowity:</b></td>
-                        <td align="right">{summary['koszt_calkowity']:.2f} PLN</td>
+                        <td align="right">{total_cost:.2f} PLN</td>
                     </tr>
                     <tr>
                         <td><b>Zysk całkowity:</b></td>
-                        <td align="right">{summary['zysk_calkowity']:.2f} PLN</td>
+                        <td align="right">{total_profit:.2f} PLN</td>
                     </tr>
                     <tr>
                         <td><b>Liczba transakcji:</b></td>
-                        <td align="right">{summary['liczba_transakcji']}</td>
-                    </tr>
-                    <tr>
-                        <td><b>Liczba pozycji:</b></td>
-                        <td align="right">{summary['liczba_pozycji']}</td>
+                        <td align="right">{total_transactions}</td>
                     </tr>
                 </table>
             </div>
             """
             
-            # Analiza limitów US
+            # Analiza limitów US - POKAZUJ ZAWSZE, nie tylko dla uproszczonego rejestru!
             year = int(date_from[:4])
             minimal_wage = self.config.get_minimal_wage(year)
             
@@ -1190,12 +1110,10 @@ class ReportDialog(QDialog):
                 limit = minimal_wage * 0.75
                 limit_text = "75% minimalnego wynagrodzenia"
             
-            total_revenue = summary['przychod_calkowity']
-            
             analysis_html = f"""
-            <div style="margin-bottom: 20px;">
-                <h3>Analiza progu dla US ({year} r.):</h3>
-                <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%;">
+            <div style="margin-bottom: 12px;">
+                <h3 style="font-size: 11px; margin-bottom: 4px;">Analiza progu dla US ({year} r.):</h3>
+                <table border="1" cellpadding="3" style="border-collapse: collapse; width: 100%; font-size: 9px;">
                     <tr>
                         <td><b>Minimalne wynagrodzenie:</b></td>
                         <td align="right">{minimal_wage:.2f} PLN</td>
@@ -1221,45 +1139,94 @@ class ReportDialog(QDialog):
             # Dodatkowa informacja dla raportów kwartalnych
             if is_quarterly_report and self.config.use_quarterly_limits():
                 analysis_html += f"""
-                <div style="margin-bottom: 20px; padding: 10px; background-color: #f0f0f0; border-left: 4px solid #2E7D32;">
+                <div style="margin-bottom: 12px; padding: 6px; background-color: #f0f0f0; border-left: 3px solid #2E7D32; font-size: 8px;">
                     <p><b>UWAGA:</b> Od 2026 roku obowiązują limity kwartalne dla działalności nierejestrowanej.</p>
                     <p>Limit kwartalny wynosi {limit_multiplier*100:.0f}% minimalnego wynagrodzenia.</p>
                     <p>Przychód w tym kwartale: <b>{total_revenue:.2f} PLN</b></p>
                 </div>
                 """
             
-            # Podsumowanie miesięczne (jeśli dostępne)
-            monthly_html = ""
-            if register_data.get("podsumowanie_miesieczne_narastajaco"):
-                monthly_rows = ""
-                for month_data in register_data["podsumowanie_miesieczne_narastajaco"]:
-                    monthly_rows += f"""
+            # Szczegółowa ewidencja transakcji - ZOPTYMALIZOWANA DLA A4
+            transactions_html = ""
+            if sales_data:
+                trans_rows = ""
+                for sale in sales_data:
+                    # Używamy formatu poziomego zamiast pionowego
+                    products_display = sale['products_horizontal']
+                    
+                    trans_rows += f"""
                     <tr>
-                        <td>{month_data['miesiac']}</td>
-                        <td align="right">{month_data['przychod_miesiac']:.2f} PLN</td>
-                        <td align="right">{month_data['zysk_miesiac']:.2f} PLN</td>
-                        <td align="right">{month_data['liczba_transakcji']}</td>
-                        <td align="right">{month_data.get('liczba_pozycji', 0)}</td>
-                        <td align="right">{month_data['przychod_narastajaco']:.2f} PLN</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{sale['date']}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{sale['platform']}</td>
+                        <td style="font-size: 6px; padding: 2px; border: 1px solid #ddd; max-width: 160px; word-wrap: break-word; text-align: left;">{products_display}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{sale['total_quantity']}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{sale['revenue_pln']:.2f}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{sale['cost_pln']:.2f}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{sale['profit_pln']:.2f}</td>
                     </tr>
                     """
                 
-                monthly_html = f"""
-                <div style="margin-bottom: 20px;">
-                    <h3>Podsumowanie miesięczne:</h3>
-                    <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%; font-size: 10px;">
+                transactions_html = f"""
+                <div style="margin-bottom: 15px; page-break-before: always;">
+                    <h4 style="font-size: 9px; margin-bottom: 3px; font-weight: bold; color: #333;">Szczegółowa ewidencja transakcji (połączone):</h4>
+                    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 7px; table-layout: fixed;">
                         <thead>
-                            <tr>
-                                <th>Miesiąc</th>
-                                <th>Przychód</th>
-                                <th>Zysk</th>
-                                <th>Transakcje</th>
-                                <th>Pozycje</th>
-                                <th>Przychód narastająco</th>
+                            <tr style="background-color: #f2f2f2;">
+                                <th style="width: 50px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Data</th>
+                                <th style="width: 60px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Platforma</th>
+                                <th style="width: 160px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Produkty</th>
+                                <th style="width: 35px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Ilość</th>
+                                <th style="width: 55px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Wartość</th>
+                                <th style="width: 55px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Koszt</th>
+                                <th style="width: 55px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Zysk</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {monthly_rows}
+                            {trans_rows}
+                        </tbody>
+                    </table>
+                    <p style="font-size: 6px; color: #666; margin-top: 2px; font-style: italic;">
+                        * Produkty wyświetlane poziomo, nazwy skrócone do 150 znaków dla czytelności
+                    </p>
+                </div>
+                """
+            elif register_data and register_data.get("transakcje"):
+                # Stary format dla niepołączonych transakcji
+                trans_rows = ""
+                for transaction in register_data["transakcje"]:
+                    product_display = f"{transaction['nazwa_produktu']} ({transaction['kod_produktu']})"
+                    if len(product_display) > 80:
+                        product_display = product_display[:77] + "..."
+                    
+                    trans_rows += f"""
+                    <tr>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{transaction['data_sprzedazy']}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{transaction['platforma']}</td>
+                        <td style="font-size: 6px; padding: 2px; border: 1px solid #ddd; max-width: 120px; word-wrap: break-word; text-align: left;">{product_display}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: center;">{transaction['ilosc']}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{transaction['wartosc_sprzedazy_pln']:.2f}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{transaction['koszt_zakupu']:.2f}</td>
+                        <td style="font-size: 7px; padding: 2px; border: 1px solid #ddd; text-align: right;">{transaction['zysk_brutto']:.2f}</td>
+                    </tr>
+                    """
+                
+                transactions_html = f"""
+                <div style="margin-bottom: 15px; page-break-before: always;">
+                    <h4 style="font-size: 9px; margin-bottom: 3px; font-weight: bold; color: #333;">Szczegółowa ewidencja transakcji (niepołączone):</h4>
+                    <table border="0" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 7px; table-layout: fixed;">
+                        <thead>
+                            <tr style="background-color: #f2f2f2;">
+                                <th style="width: 50px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Data</th>
+                                <th style="width: 70px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Platforma</th>
+                                <th style="width: 120px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Produkt</th>
+                                <th style="width: 40px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Ilość</th>
+                                <th style="width: 60px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Wartość</th>
+                                <th style="width: 60px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Koszt</th>
+                                <th style="width: 60px; font-size: 7px; padding: 3px; border: 1px solid #ddd; font-weight: bold; text-align: center;">Zysk</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {trans_rows}
                         </tbody>
                     </table>
                 </div>
@@ -1267,14 +1234,16 @@ class ReportDialog(QDialog):
             
             # Stopka
             footer = f"""
-            <div style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9px; color: #666;">
+            <div style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 7px; color: #666;">
                 <p>Raport wygenerowany: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
                 <p>Typ raportu: {self.report_type}</p>
+                <p>Łączenie sprzedaży: {'Tak' if self.cb_consolidate_sales.isChecked() else 'Nie'}</p>
+                <p>Uproszczony rejestr: {'Tak' if self.cb_simple_register.isChecked() else 'Nie'}</p>
                 <p>System Magazynowo-Sprzedażowy v{APP_VERSION}</p>
             </div>
             """
             
-            # Cały dokument HTML
+            # Cały dokument HTML - ZOPTYMALIZOWANY DLA DRUKU
             html = f"""
             <!DOCTYPE html>
             <html>
@@ -1282,25 +1251,121 @@ class ReportDialog(QDialog):
                 <meta charset="UTF-8">
                 <title>{title}</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                    h1 {{ color: #2E7D32; border-bottom: 2px solid #2E7D32; padding-bottom: 10px; }}
-                    h3 {{ color: #333; margin-top: 25px; }}
-                    table {{ margin-top: 10px; }}
-                    th {{ background-color: #f2f2f2; padding: 8px; }}
-                    td {{ padding: 6px; }}
-                    .footer {{ margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9px; color: #666; }}
-                    .info-box {{ background-color: #f0f0f0; padding: 10px; border-left: 4px solid #2E7D32; margin: 10px 0; }}
+                    @media print {{
+                        @page {{
+                            size: A4;
+                            margin: 8mm 10mm 8mm 10mm;
+                        }}
+                        body {{
+                            margin: 0;
+                            padding: 0;
+                            font-family: Arial, sans-serif;
+                            font-size: 8px;
+                            color: black;
+                        }}
+                        h1 {{
+                            color: #2E7D32;
+                            border-bottom: 1px solid #2E7D32;
+                            padding-bottom: 4px;
+                            font-size: 12px;
+                            margin-bottom: 8px;
+                        }}
+                        h2 {{
+                            color: #333;
+                            margin-top: 10px;
+                            font-size: 10px;
+                            margin-bottom: 5px;
+                        }}
+                        h3 {{
+                            color: #333;
+                            margin-top: 8px;
+                            font-size: 9px;
+                            margin-bottom: 4px;
+                        }}
+                        h4 {{
+                            color: #333;
+                            margin-top: 6px;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                        }}
+                        p {{
+                            margin: 2px 0;
+                            font-size: 8px;
+                        }}
+                        table {{
+                            margin-top: 5px;
+                            width: 100%;
+                            table-layout: fixed;
+                            border-collapse: collapse;
+                        }}
+                        th {{
+                            background-color: #f2f2f2;
+                            padding: 3px;
+                            text-align: left;
+                            font-weight: bold;
+                            font-size: 7px;
+                            border: 1px solid #ddd;
+                        }}
+                        td {{
+                            padding: 2px;
+                            vertical-align: top;
+                            border: 1px solid #ddd;
+                            font-size: 7px;
+                        }}
+                        .footer {{
+                            margin-top: 12px;
+                            border-top: 1px solid #ccc;
+                            padding-top: 5px;
+                            font-size: 7px;
+                            color: #666;
+                        }}
+                    }}
+                    @media screen {{
+                        body {{
+                            font-family: Arial, sans-serif;
+                            margin: 8px;
+                            font-size: 8px;
+                        }}
+                        h1 {{
+                            color: #2E7D32;
+                            border-bottom: 1px solid #2E7D32;
+                            padding-bottom: 5px;
+                            font-size: 12px;
+                        }}
+                        h2 {{ font-size: 10px; }}
+                        h3 {{ font-size: 9px; }}
+                        h4 {{ font-size: 8px; }}
+                        p {{ font-size: 8px; }}
+                        table {{ 
+                            width: 100%; 
+                            table-layout: fixed;
+                            border-collapse: collapse;
+                        }}
+                        th {{ 
+                            background-color: #f2f2f2; 
+                            padding: 3px; 
+                            border: 1px solid #ddd; 
+                            font-size: 7px;
+                        }}
+                        td {{ 
+                            padding: 2px; 
+                            border: 1px solid #ddd; 
+                            font-size: 7px;
+                        }}
+                    }}
                 </style>
             </head>
             <body>
                 <h1>{title}</h1>
                 <p><b>Okres:</b> {date_from} - {date_to}</p>
                 <p><b>Wygenerowano:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><b>Łączenie sprzedaży:</b> {'Tak' if self.cb_consolidate_sales.isChecked() else 'Nie'}</p>
+                <p><b>Uproszczony rejestr:</b> {'Tak' if self.cb_simple_register.isChecked() else 'Nie'}</p>
                 
                 {seller_info}
                 {summary_html}
                 {analysis_html}
-                {monthly_html}
+                {transactions_html}
                 {footer}
             </body>
             </html>
@@ -1320,9 +1385,9 @@ class ReportDialog(QDialog):
                 QMessageBox.warning(self, "Brak danych", "Wybierz przynajmniej jeden typ danych (zakupy lub sprzedaż).")
                 return
             
-            personal_data = self.config.get_business_info()
-            
+            personal_data = {}
             if self.cb_simple_register.isChecked():
+                personal_data = self.config.get_business_info()
                 required_fields = ['name', 'address', 'postal_code', 'city', 'pesel']
                 missing_fields = [field for field in required_fields if not personal_data.get(field)]
                 
@@ -1359,6 +1424,10 @@ class ReportDialog(QDialog):
                 to_str = date_to.replace("-", "")
                 suggested_name = f"raport_{from_str}_do_{to_str}{default_ext}"
             
+            # Dodaj info o typie raportu do nazwy
+            if self.cb_simple_register.isChecked():
+                suggested_name = suggested_name.replace(default_ext, f"_us{default_ext}")
+            
             path, _ = QFileDialog.getSaveFileName(
                 self, "Zapisz raport", 
                 os.path.join(os.getcwd(), suggested_name),
@@ -1368,34 +1437,22 @@ class ReportDialog(QDialog):
             if path:
                 try:
                     if self.rb_csv.isChecked():
-                        success = self.db.export_detailed_report_csv(
+                        success = self.export_consolidated_report_csv(
                             path, date_from, date_to,
-                            include_purchases=self.cb_purchases.isChecked(),
-                            include_sales=self.cb_sales.isChecked(),
-                            include_summary=self.cb_summary.isChecked(),
-                            include_products=self.cb_products.isChecked(),
                             personal_data=personal_data if self.cb_simple_register.isChecked() else None,
                             report_type=self.report_type,
                             config=self.config
                         )
                     elif self.rb_excel.isChecked():
-                        success = self.db.export_detailed_report_excel(
+                        success = self.export_consolidated_report_excel(
                             path, date_from, date_to,
-                            include_purchases=self.cb_purchases.isChecked(),
-                            include_sales=self.cb_sales.isChecked(),
-                            include_summary=self.cb_summary.isChecked(),
-                            include_products=self.cb_products.isChecked(),
                             personal_data=personal_data if self.cb_simple_register.isChecked() else None,
                             report_type=self.report_type,
                             config=self.config
                         )
                     else:  # PDF
-                        success = self.export_detailed_report_pdf(
+                        success = self.export_consolidated_report_pdf(
                             path, date_from, date_to,
-                            include_purchases=self.cb_purchases.isChecked(),
-                            include_sales=self.cb_sales.isChecked(),
-                            include_summary=self.cb_summary.isChecked(),
-                            include_products=self.cb_products.isChecked(),
                             personal_data=personal_data if self.cb_simple_register.isChecked() else None
                         )
                     
@@ -1416,10 +1473,271 @@ class ReportDialog(QDialog):
             import traceback
             print(traceback.format_exc())
 
-    def export_detailed_report_pdf(self, path, date_from, date_to,
-                                 include_purchases=True, include_sales=True,
-                                 include_summary=True, include_products=False,
-                                 personal_data=None):
+    def export_consolidated_report_csv(self, path, date_from, date_to, personal_data=None, report_type=None, config=None):
+        """Eksportuje raport CSV z połączonymi sprzedażami"""
+        try:
+            import csv
+            
+            sales_data = self.get_consolidated_sales_data(date_from, date_to)
+            
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f, delimiter=";")
+                
+                title = "RAPORT SPRZEDAŻY (POŁĄCZONY)"
+                if report_type == "quarterly":
+                    title = "RAPORT KWARTALNY SPRZEDAŻY (POŁĄCZONY)"
+                elif report_type == "monthly":
+                    title = "RAPORT MIESIĘCZNY SPRZEDAŻY (POŁĄCZONY)"
+                elif report_type == "yearly":
+                    title = "RAPORT ROCZNY SPRZEDAŻY (POŁĄCZONY)"
+                
+                w.writerow([title])
+                w.writerow([f"Okres: {date_from} - {date_to}"])
+                w.writerow([f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+                w.writerow([f"Łączenie sprzedaży: TAK"])
+                w.writerow([])
+                
+                # Dane sprzedawcy - tylko jeśli zaznaczono uproszczony rejestr
+                if personal_data:
+                    w.writerow(["DANE SPRZEDAWCY"])
+                    w.writerow([f"Imię i nazwisko: {personal_data.get('name', '')}"])
+                    w.writerow([f"Adres: {personal_data.get('address', '')}"])
+                    w.writerow([f"Kod pocztowy: {personal_data.get('postal_code', '')}"])
+                    w.writerow([f"Miejscowość: {personal_data.get('city', '')}"])
+                    w.writerow([f"PESEL: {personal_data.get('pesel', '')}"])
+                    if personal_data.get('nip'):
+                        w.writerow([f"NIP: {personal_data.get('nip', '')}"])
+                    if personal_data.get('regon'):
+                        w.writerow([f"REGON: {personal_data.get('regon', '')}"])
+                    w.writerow([])
+                
+                # Podsumowanie
+                total_revenue = sum(sale['revenue_pln'] for sale in sales_data)
+                total_cost = sum(sale['cost_pln'] for sale in sales_data)
+                total_profit = total_revenue - total_cost
+                
+                w.writerow(["PODSUMOWANIE OGÓLNE"])
+                w.writerow(["Przychód całkowity:", f"{total_revenue:.2f} PLN"])
+                w.writerow(["Koszt całkowity:", f"{total_cost:.2f} PLN"])
+                w.writerow(["Zysk całkowity:", f"{total_profit:.2f} PLN"])
+                w.writerow(["Liczba transakcji (zamówień):", len(sales_data)])
+                w.writerow([])
+                
+                # Analiza limitów US - POKAZUJ ZAWSZE, nie tylko dla uproszczonego rejestru!
+                year = int(date_from[:4])
+                minimal_wage = config.get_minimal_wage(year) if config else 4242.00
+                
+                is_quarterly = report_type == "quarterly"
+                use_quarterly = config.use_quarterly_limits() if config else True
+                
+                if is_quarterly and use_quarterly:
+                    limit_multiplier = config.get_limits_config().get("quarterly_limit_multiplier", 2.25) if config else 2.25
+                    limit = minimal_wage * limit_multiplier
+                    limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia (limit kwartalny)"
+                else:
+                    limit = minimal_wage * 0.75
+                    limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+                
+                w.writerow([f"ANALIZA PROGU LIMITU ({year} r.)"])
+                w.writerow([f"Minimalne wynagrodzenie: {minimal_wage} PLN"])
+                w.writerow([f"{limit_text}: {limit:.2f} PLN"])
+                w.writerow([f"Przychód narastająco w roku {year}: {total_revenue:.2f} PLN"])
+                
+                if total_revenue > limit:
+                    w.writerow(["UWAGA: Przekroczono limit działalności nierejestrowanej!"])
+                    w.writerow(["Konieczna rejestracja działalności gospodarczej"])
+                else:
+                    w.writerow(["OK: Przychód mieści się w limicie działalności nierejestrowanej"])
+                
+                w.writerow([])
+                
+                # Szczegółowa ewidencja
+                w.writerow(["SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI (POŁĄCZONE)"])
+                w.writerow(["Data", "Platforma", "Produkty", "Ilość łącznie", "Wartość sprzedaży", "Koszt zakupu", "Zysk"])
+                
+                for sale in sales_data:
+                    products_display = sale['products_horizontal']
+                    
+                    w.writerow([
+                        sale['date'],
+                        sale['platform'],
+                        products_display,
+                        sale['total_quantity'],
+                        f"{sale['revenue_pln']:.2f}",
+                        f"{sale['cost_pln']:.2f}",
+                        f"{sale['profit_pln']:.2f}"
+                    ])
+                
+                return True
+                
+        except Exception as e:
+            print(f"Błąd w export_consolidated_report_csv: {e}")
+            return False
+
+    def export_consolidated_report_excel(self, path, date_from, date_to, personal_data=None, report_type=None, config=None):
+        """Eksportuje raport Excel z połączonymi sprzedażami"""
+        if not HAS_EXCEL:
+            raise ImportError("Biblioteka openpyxl nie jest zainstalowana. Użyj: pip install openpyxl")
+        
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.utils import get_column_letter
+            
+            sales_data = self.get_consolidated_sales_data(date_from, date_to)
+            
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Raport sprzedaży"
+            
+            # Style
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center")
+            money_format = '#,##0.00'
+            
+            row = 1
+            
+            # Tytuł
+            title = "RAPORT SPRZEDAŻY (POŁĄCZONY)"
+            if report_type == "quarterly":
+                title = "RAPORT KWARTALNY SPRZEDAŻY (POŁĄCZONY)"
+            elif report_type == "monthly":
+                title = "RAPORT MIESIĘCZNY SPRZEDAŻY (POŁĄCZONY)"
+            elif report_type == "yearly":
+                title = "RAPORT ROCZNY SPRZEDAŻY (POŁĄCZONY)"
+            
+            ws.cell(row=row, column=1, value=title).font = Font(bold=True, size=14)
+            row += 2
+            
+            ws.cell(row=row, column=1, value=f"Okres: {date_from} - {date_to}").font = Font(bold=True)
+            row += 1
+            ws.cell(row=row, column=1, value=f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            row += 1
+            ws.cell(row=row, column=1, value=f"Łączenie sprzedaży: TAK")
+            row += 1
+            ws.cell(row=row, column=1, value=f"Uproszczony rejestr: {'TAK' if personal_data else 'NIE'}")
+            row += 2
+            
+            # Dane sprzedawcy - tylko jeśli zaznaczono uproszczony rejestr
+            if personal_data:
+                ws.cell(row=row, column=1, value="DANE SPRZEDAWCY").font = Font(bold=True)
+                row += 1
+                
+                ws.cell(row=row, column=1, value=f"Imię i nazwisko: {personal_data.get('name', '')}")
+                row += 1
+                ws.cell(row=row, column=1, value=f"Adres: {personal_data.get('address', '')}")
+                row += 1
+                ws.cell(row=row, column=1, value=f"Kod pocztowy: {personal_data.get('postal_code', '')}")
+                row += 1
+                ws.cell(row=row, column=1, value=f"Miejscowość: {personal_data.get('city', '')}")
+                row += 1
+                ws.cell(row=row, column=1, value=f"PESEL: {personal_data.get('pesel', '')}")
+                row += 2
+            
+            # Podsumowanie
+            total_revenue = sum(sale['revenue_pln'] for sale in sales_data)
+            total_cost = sum(sale['cost_pln'] for sale in sales_data)
+            total_profit = total_revenue - total_cost
+            
+            ws.cell(row=row, column=1, value="PODSUMOWANIE OGÓLNE").font = Font(bold=True)
+            row += 1
+            
+            summary_data = [
+                ["Przychód całkowity:", total_revenue],
+                ["Koszt całkowity:", total_cost],
+                ["Zysk całkowity:", total_profit],
+                ["Liczba transakcji (zamówień):", len(sales_data)]
+            ]
+            
+            for label, value in summary_data:
+                ws.cell(row=row, column=1, value=label)
+                if isinstance(value, (int, float)):
+                    ws.cell(row=row, column=2, value=value)
+                    ws.cell(row=row, column=2).number_format = money_format
+                else:
+                    ws.cell(row=row, column=2, value=value)
+                row += 1
+            
+            row += 1
+            
+            # Analiza limitów US - POKAZUJ ZAWSZE
+            year = int(date_from[:4])
+            minimal_wage = config.get_minimal_wage(year) if config else 4242.00
+            
+            is_quarterly = report_type == "quarterly"
+            use_quarterly = config.use_quarterly_limits() if config else True
+            
+            if is_quarterly and use_quarterly:
+                limit_multiplier = config.get_limits_config().get("quarterly_limit_multiplier", 2.25) if config else 2.25
+                limit = minimal_wage * limit_multiplier
+                limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia (limit kwartalny)"
+            else:
+                limit = minimal_wage * 0.75
+                limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+            
+            ws.cell(row=row, column=1, value=f"ANALIZA PROGU LIMITU ({year} r.)").font = Font(bold=True, color="FF0000")
+            row += 1
+            
+            limit_data = [
+                ["Minimalne wynagrodzenie:", minimal_wage],
+                [limit_text, limit],
+                ["Przychód narastająco:", total_revenue],
+                ["Stan:", "PRZEKROCZONO LIMIT!" if total_revenue > limit else "W LIMICIE"]
+            ]
+            
+            for label, value in limit_data:
+                ws.cell(row=row, column=1, value=label)
+                if isinstance(value, (int, float)):
+                    ws.cell(row=row, column=2, value=value)
+                    ws.cell(row=row, column=2).number_format = money_format
+                else:
+                    ws.cell(row=row, column=2, value=value)
+                row += 1
+            
+            row += 2
+            
+            # Nagłówki tabeli
+            headers = ["Data", "Platforma", "Produkty", "Ilość łącznie", "Wartość sprzedaży", "Koszt zakupu", "Zysk"]
+            for col, header in enumerate(headers, start=1):
+                cell = ws.cell(row=row, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+            
+            row += 1
+            
+            # Dane - FORMAT POZIOMY Z UMIARKOWANYMI NAZWAMI
+            for sale in sales_data:
+                ws.cell(row=row, column=1, value=sale['date'])
+                ws.cell(row=row, column=2, value=sale['platform'])
+                
+                # Produkty w formacie poziomym (oddzielone przecinkami)
+                products_display = sale['products_horizontal']
+                ws.cell(row=row, column=3, value=products_display)
+                ws.cell(row=row, column=3).alignment = Alignment(wrap_text=True, vertical='top')
+                
+                ws.cell(row=row, column=4, value=sale['total_quantity'])
+                ws.cell(row=row, column=5, value=sale['revenue_pln']).number_format = money_format
+                ws.cell(row=row, column=6, value=sale['cost_pln']).number_format = money_format
+                ws.cell(row=row, column=7, value=sale['profit_pln']).number_format = money_format
+                
+                row += 1
+            
+            # Ustaw szerokości kolumn - ROZSĄDNA SZEROKOŚĆ DLA PRODUKTÓW
+            column_widths = [12, 15, 40, 12, 15, 15, 15]  # Kolumna Produkty ma 40 znaków
+            for i, width in enumerate(column_widths, start=1):
+                ws.column_dimensions[get_column_letter(i)].width = width
+            
+            wb.save(path)
+            return True
+            
+        except Exception as e:
+            print(f"Błąd w export_consolidated_report_excel: {e}")
+            return False
+
+    def export_consolidated_report_pdf(self, path, date_from, date_to, personal_data=None):
+        """Eksportuje raport PDF z połączonymi sprzedażami"""
         try:
             from reportlab.lib.pagesizes import A4
             from reportlab.lib import colors
@@ -1448,13 +1766,15 @@ class ReportDialog(QDialog):
                 except:
                     continue
             
+            sales_data = self.get_consolidated_sales_data(date_from, date_to)
+            
             doc = SimpleDocTemplate(
                 path,
                 pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm,
-                topMargin=2*cm,
-                bottomMargin=2*cm
+                rightMargin=1.2*cm,
+                leftMargin=1.2*cm,
+                topMargin=1.2*cm,
+                bottomMargin=1.2*cm
             )
             
             story = []
@@ -1465,8 +1785,8 @@ class ReportDialog(QDialog):
                 'CustomTitle',
                 parent=styles['Heading1'],
                 fontName=font_name,
-                fontSize=16,
-                spaceAfter=30,
+                fontSize=11,
+                spaceAfter=12,
                 alignment=1
             )
             
@@ -1475,28 +1795,8 @@ class ReportDialog(QDialog):
                 'Normal',
                 parent=styles['Normal'],
                 fontName=font_name,
-                fontSize=10,
-                spaceAfter=6
-            )
-            
-            # Styl nagłówka
-            header_style = ParagraphStyle(
-                'Header',
-                parent=styles['Normal'],
-                fontName=font_name,
-                fontSize=11,
-                textColor=colors.whitesmoke,
-                alignment=1
-            )
-            
-            # Styl podtytułu
-            subtitle_style = ParagraphStyle(
-                'Subtitle',
-                parent=styles['Heading2'],
-                fontName=font_name,
-                fontSize=12,
-                spaceAfter=20,
-                alignment=0
+                fontSize=7,
+                spaceAfter=3
             )
             
             # Tytuł raportu
@@ -1513,20 +1813,18 @@ class ReportDialog(QDialog):
             else:
                 story.append(Paragraph("RAPORT SZCZEGÓŁOWY", title_style))
                 
-            story.append(Spacer(1, 10))
+            story.append(Spacer(1, 6))
             
             # Okres raportu
-            period_text = f"Okres: {date_from} - {date_to}"
-            story.append(Paragraph(period_text, subtitle_style))
+            story.append(Paragraph(f"Okres: {date_from} - {date_to}", normal_style))
+            story.append(Paragraph(f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", normal_style))
+            story.append(Paragraph(f"Łączenie sprzedaży: TAK", normal_style))
+            story.append(Paragraph(f"Uproszczony rejestr: {'TAK' if personal_data else 'NIE'}", normal_style))
+            story.append(Spacer(1, 10))
             
-            # Data generowania
-            gen_date = f"Wygenerowano: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            story.append(Paragraph(gen_date, normal_style))
-            story.append(Spacer(1, 30))
-            
-            # Dane sprzedawcy (jeśli dostępne)
-            if personal_data and personal_data.get('name'):
-                story.append(Paragraph("DANE SPRZEDAWCY", subtitle_style))
+            # Dane sprzedawcy - tylko jeśli zaznaczono uproszczony rejestr
+            if personal_data:
+                story.append(Paragraph("DANE SPRZEDAWCY", ParagraphStyle('Subtitle', parent=styles['Heading2'], fontName=font_name, fontSize=8)))
                 
                 seller_info = [
                     f"Imię i nazwisko: {personal_data.get('name', '')}",
@@ -1543,200 +1841,164 @@ class ReportDialog(QDialog):
                 for info in seller_info:
                     story.append(Paragraph(info, normal_style))
                 
-                story.append(Spacer(1, 20))
+                story.append(Spacer(1, 10))
             
-            # Pobierz dane z bazy
-            register_data = self.db.get_simple_sales_register_with_cumulative(date_from, date_to, personal_data or {})
+            # Podsumowanie
+            total_revenue = sum(sale['revenue_pln'] for sale in sales_data)
+            total_cost = sum(sale['cost_pln'] for sale in sales_data)
+            total_profit = total_revenue - total_cost
             
-            if register_data and register_data.get("transakcje"):
-                # Podsumowanie ogólne
-                story.append(Paragraph("PODSUMOWANIE OGÓLNE", subtitle_style))
-                
-                summary = register_data["podsumowanie_ogolne"]
-                summary_data = [
-                    ["Przychód całkowity:", f"{summary['przychod_calkowity']:.2f} PLN"],
-                    ["Koszt całkowity:", f"{summary['koszt_calkowity']:.2f} PLN"],
-                    ["Zysk całkowity:", f"{summary['zysk_calkowity']:.2f} PLN"],
-                    ["Liczba transakcji:", str(summary['liczba_transakcji'])],
-                    ["Liczba pozycji:", str(summary['liczba_pozycji'])]
-                ]
-                
-                summary_table = Table(summary_data, colWidths=[8*cm, 5*cm])
-                summary_table.setStyle(TableStyle([
-                    ('FONTNAME', (0, 0), (-1, -1), font_name),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-                    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                ]))
-                
-                story.append(summary_table)
-                story.append(Spacer(1, 30))
-                
-                # Analiza progu US z uwzględnieniem konfiguracji
-                story.append(Paragraph("ANALIZA PROGU DLA US", subtitle_style))
-                
-                year = int(date_from[:4])
-                minimal_wage = self.config.get_minimal_wage(year)
-                
-                # Określ czy to raport kwartalny
-                is_quarterly_report = self.report_type == "quarterly"
-                
-                if is_quarterly_report and self.config.use_quarterly_limits():
-                    # Używamy limitów kwartalnych
-                    limit_type = "kwartalny"
-                    limit_multiplier = self.config.get_limits_config().get("quarterly_limit_multiplier", 2.25)
-                    limit = minimal_wage * limit_multiplier
-                    limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia"
-                else:
-                    # Używamy limitów miesięcznych
-                    limit_type = "miesięczny"
-                    limit = minimal_wage * 0.75
-                    limit_text = "75% minimalnego wynagrodzenia"
-                
-                total_revenue = summary['przychod_calkowity']
-                
-                analysis_data = [
-                    ["Minimalne wynagrodzenie:", f"{minimal_wage:.2f} PLN"],
-                    [f"{limit_text} (limit {limit_type}):", f"{limit:.2f} PLN"],
-                    ["Przychód narastająco:", f"{total_revenue:.2f} PLN"],
-                    ["Stan:", "PRZEKROCZONO LIMIT!" if total_revenue > limit else "W LIMICIE"]
-                ]
-                
-                analysis_table = Table(analysis_data, colWidths=[8*cm, 5*cm])
-                analysis_table.setStyle(TableStyle([
-                    ('FONTNAME', (0, 0), (-1, -1), font_name),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
-                    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                    ('TEXTCOLOR', (1, 3), (1, 3), colors.red if total_revenue > limit else colors.green),
-                ]))
-                
-                story.append(analysis_table)
-                story.append(Spacer(1, 30))
-                
-                # Dodatkowa informacja dla raportów kwartalnych
-                if is_quarterly_report and self.config.use_quarterly_limits():
-                    info_text = Paragraph(
-                        f"<b>UWAGA:</b> Od 2026 roku obowiązują limits kwartalne dla działalności nierejestrowanej.<br/>"
-                        f"Limit kwartalny wynosi {limit_multiplier*100:.0f}% minimalnego wynagrodzenia.<br/>"
-                        f"Przychód w tym kwartale: <b>{total_revenue:.2f} PLN</b>",
-                        ParagraphStyle('Info', parent=styles['Normal'], fontName=font_name, fontSize=9,
-                                     backColor=colors.lightgrey, borderPadding=10,
-                                     leftIndent=20, rightIndent=20)
-                    )
-                    story.append(info_text)
-                    story.append(Spacer(1, 20))
-                
-                # Podsumowanie miesięczne (jeśli dostępne)
-                if register_data.get("podsumowanie_miesieczne_narastajaco"):
-                    story.append(Paragraph("PODSUMOWANIE MIESIĘCZNE", subtitle_style))
-                    
-                    headers = ["Miesiąc", "Przychód", "Zysk", "Transakcje", "Pozycje", "Przychód narastająco"]
-                    monthly_data = [headers]
-                    
-                    for month_data in register_data["podsumowanie_miesieczne_narastajaco"]:
-                        monthly_data.append([
-                            month_data['miesiac'],
-                            f"{month_data['przychod_miesiac']:.2f} PLN",
-                            f"{month_data['zysk_miesiac']:.2f} PLN",
-                            str(month_data['liczba_transakcji']),
-                            str(month_data.get('liczba_pozycji', 0)),
-                            f"{month_data['przychod_narastajaco']:.2f} PLN"
-                        ])
-                    
-                    monthly_table = Table(monthly_data, colWidths=[3*cm, 3*cm, 3*cm, 2*cm, 2*cm, 3*cm])
-                    monthly_table.setStyle(TableStyle([
-                        ('FONTNAME', (0, 0), (-1, -1), font_name),
-                        ('FONTSIZE', (0, 0), (-1, -1), 9),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-                        ('ALIGN', (3, 0), (4, -1), 'CENTER'),
-                    ]))
-                    
-                    story.append(monthly_table)
-                    story.append(Spacer(1, 30))
-                
-                # Jeśli włączone szczegółowe transakcje
-                if include_sales and len(register_data["transakcje"]) > 0:
-                    story.append(PageBreak())
-                    story.append(Paragraph("SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI", subtitle_style))
-                    
-                    # Ogranicz liczbę transakcji do pierwszej strony
-                    max_transactions = 50
-                    transactions = register_data["transakcje"][:max_transactions]
-                    
-                    trans_headers = ["Data", "Platforma", "Produkt", "Ilość", "Cena", "Wartość", "Zysk"]
-                    trans_data = [trans_headers]
-                    
-                    for transaction in transactions:
-                        # Skracamy nazwę produktu, aby zmieściła się w komórce
-                        product_name = transaction['nazwa_produktu']
-                        
-                        # Skracamy nazwę do 35 znaków jeśli jest za długa
-                        if len(product_name) > 35:
-                            product_display = f"{product_name[:32]}..."
-                        else:
-                            product_display = product_name
-                        
-                        # Platforma też może być długa - skracamy do 15 znaków
-                        platform = transaction['platforma']
-                        if len(platform) > 15:
-                            platform = f"{platform[:12]}..."
-                        
-                        trans_data.append([
-                            transaction['data_sprzedazy'],
-                            platform,
-                            product_display,
-                            str(transaction['ilosc']),
-                            f"{transaction['cena_jednostkowa_pln']:.2f}",
-                            f"{transaction['wartosc_sprzedazy_pln']:.2f}",
-                            f"{transaction['zysk_brutto']:.2f}"
-                        ])
-                    
-                    trans_table = Table(trans_data, colWidths=[2.5*cm, 2.5*cm, 5*cm, 1.5*cm, 2*cm, 2*cm, 2*cm])
-                    trans_table.setStyle(TableStyle([
-                        ('FONTNAME', (0, 0), (-1, -1), font_name),
-                        ('FONTSIZE', (0, 0), (-1, -1), 8),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                        ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Data - wyśrodkowana
-                        ('ALIGN', (1, 0), (1, -1), 'CENTER'),  # Platforma - wyśrodkowana
-                        ('ALIGN', (3, 0), (3, -1), 'CENTER'),  # Ilość - wyśrodkowana
-                        ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),  # Cena, Wartość, Zysk - do prawej
-                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                        ('WORDWRAP', (2, 1), (2, -1), True),  # Włącz zawijanie tekstu dla kolumny produktu
-                    ]))
-                    
-                    story.append(trans_table)
-                    
-                    if len(register_data["transakcje"]) > max_transactions:
-                        story.append(Spacer(1, 10))
-                        remaining = len(register_data["transakcje"]) - max_transactions
-                        story.append(Paragraph(f"... i {remaining} kolejnych transakcji", normal_style))
+            story.append(Paragraph("PODSUMOWANIE OGÓLNE", ParagraphStyle('Subtitle', parent=styles['Heading2'], fontName=font_name, fontSize=8)))
+            
+            summary_data = [
+                ["Przychód całkowity:", f"{total_revenue:.2f} PLN"],
+                ["Koszt całkowity:", f"{total_cost:.2f} PLN"],
+                ["Zysk całkowity:", f"{total_profit:.2f} PLN"],
+                ["Liczba transakcji:", str(len(sales_data))]
+            ]
+            
+            summary_table = Table(summary_data, colWidths=[5*cm, 3.5*cm])
+            summary_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ]))
+            
+            story.append(summary_table)
+            story.append(Spacer(1, 10))
+            
+            # Analiza limitów US - POKAZUJ ZAWSZE
+            year = int(date_from[:4])
+            minimal_wage = self.config.get_minimal_wage(year)
+            
+            is_quarterly = self.report_type == "quarterly"
+            use_quarterly = self.config.use_quarterly_limits()
+            
+            if is_quarterly and use_quarterly:
+                limit_multiplier = self.config.get_limits_config().get("quarterly_limit_multiplier", 2.25)
+                limit = minimal_wage * limit_multiplier
+                limit_text = f"{limit_multiplier*100:.0f}% minimalnego wynagrodzenia (limit kwartalny)"
             else:
-                story.append(Paragraph("Brak danych sprzedaży w wybranym okresie", subtitle_style))
+                limit = minimal_wage * 0.75
+                limit_text = "75% minimalnego wynagrodzenia (limit miesięczny)"
+            
+            story.append(Paragraph("ANALIZA PROGU DLA US", ParagraphStyle('Subtitle', parent=styles['Heading2'], fontName=font_name, fontSize=8)))
+            
+            limit_data = [
+                ["Minimalne wynagrodzenie:", f"{minimal_wage:.2f} PLN"],
+                [limit_text, f"{limit:.2f} PLN"],
+                ["Przychód narastająco:", f"{total_revenue:.2f} PLN"],
+                ["Stan:", "PRZEKROCZONO LIMIT!" if total_revenue > limit else "W LIMICIE"]
+            ]
+            
+            limit_table = Table(limit_data, colWidths=[5*cm, 3.5*cm])
+            limit_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), font_name),
+                ('FONTSIZE', (0, 0), (-1, -1), 7),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('TEXTCOLOR', (1, 3), (1, 3), colors.red if total_revenue > limit else colors.green),
+            ]))
+            
+            story.append(limit_table)
+            story.append(Spacer(1, 10))
+            
+            # Dodatkowa informacja dla raportów kwartalnych
+            if is_quarterly and use_quarterly:
+                info_text = Paragraph(
+                    f"<b>UWAGA:</b> Od 2026 roku obowiązują limity kwartalne dla działalności nierejestrowanej.<br/>"
+                    f"Limit kwartalny wynosi {limit_multiplier*100:.0f}% minimalnego wynagrodzenia.<br/>"
+                    f"Przychód w tym kwartale: <b>{total_revenue:.2f} PLN</b>",
+                    ParagraphStyle('Info', parent=styles['Normal'], fontName=font_name, fontSize=6,
+                                 backColor=colors.lightgrey, borderPadding=6,
+                                 leftIndent=8, rightIndent=8)
+                )
+                story.append(info_text)
+                story.append(Spacer(1, 10))
+            
+            # Szczegółowa ewidencja - NOWA STRONA Z ZOPTYMALIZOWANĄ TABELĄ
+            if sales_data:
+                story.append(PageBreak())
+                story.append(Paragraph("SZCZEGÓŁOWA EWIDENCJA TRANSAKCJI (POŁĄCZONE)", 
+                                     ParagraphStyle('Subtitle', parent=styles['Heading2'], fontName=font_name, fontSize=8)))
+                
+                headers = ["Data", "Platforma", "Produkty", "Ilość", "Wartość", "Koszt", "Zysk"]
+                
+                # ZOPTYMALIZOWANE SZEROKOŚCI KOLUMN DLA A4 - ZACHOWUJĄCE MIEJSCE
+                col_widths = [1.2*cm, 1.8*cm, 7.0*cm, 1.2*cm, 2.0*cm, 2.0*cm, 2.0*cm]
+                
+                # Nagłówki tabeli
+                header_data = []
+                for header in headers:
+                    header_data.append(Paragraph(header, ParagraphStyle('Header', parent=styles['Normal'], 
+                                                                       fontName=font_name, fontSize=6, 
+                                                                       alignment=1, textColor=colors.white)))
+                
+                table_data = [header_data]
+                
+                # Dane transakcji Z UMIARKOWANYMI NAZWAMI
+                for sale in sales_data:
+                    # Używamy formatu poziomego (oddzielone przecinkami)
+                    products_text = sale['products_horizontal']
+                    
+                    row = [
+                        Paragraph(sale['date'], ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=1)),
+                        Paragraph(sale['platform'], ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=1)),
+                        Paragraph(products_text, ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=4, alignment=0)),
+                        Paragraph(str(sale['total_quantity']), ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=1)),
+                        Paragraph(f"{sale['revenue_pln']:.2f} PLN", ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=2)),
+                        Paragraph(f"{sale['cost_pln']:.2f} PLN", ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=2)),
+                        Paragraph(f"{sale['profit_pln']:.2f} PLN", ParagraphStyle('Cell', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=2))
+                    ]
+                    table_data.append(row)
+                
+                # Tworzymy tabelę z zoptymalizowanymi szerokościami
+                transactions_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+                transactions_table.setStyle(TableStyle([
+                    ('FONTNAME', (0, 0), (-1, -1), font_name),
+                    ('FONTSIZE', (0, 0), (-1, -1), 5),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                    ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                    ('ALIGN', (3, 0), (3, -1), 'CENTER'),
+                    ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.whitesmoke]),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                    ('TOPPADDING', (0, 0), (-1, -1), 1),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                ]))
+                
+                story.append(transactions_table)
+                story.append(Spacer(1, 6))
+                
+                # Informacja o ograniczeniach
+                story.append(Paragraph("* Nazwy produktów ograniczone do 150 znaków dla zachowania czytelności", 
+                                     ParagraphStyle('Info', parent=styles['Normal'], fontName=font_name, fontSize=4, 
+                                                  alignment=0, textColor=colors.grey)))
+            else:
+                story.append(Paragraph("Brak danych sprzedaży w wybranym okresie", normal_style))
             
             # Stopka
-            story.append(Spacer(1, 30))
+            story.append(Spacer(1, 12))
             footer = Paragraph(f"Raport wygenerowany przez System Magazynowo-Sprzedażowy v{APP_VERSION}", 
-                             ParagraphStyle('Footer', parent=styles['Normal'], fontName=font_name, fontSize=8, alignment=1))
+                             ParagraphStyle('Footer', parent=styles['Normal'], fontName=font_name, fontSize=5, alignment=1))
             story.append(footer)
             
             doc.build(story)
             return True
             
         except Exception as e:
-            print(f"Błąd w export_detailed_report_pdf: {e}")
+            print(f"Błąd w export_consolidated_report_pdf: {e}")
             import traceback
             traceback.print_exc()
             return False
-
 # ================== SORTOWANIE ==================
 class SortableTableWidget(QTableWidget):
     def __init__(self, rows=0, columns=0, parent=None):
