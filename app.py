@@ -20,6 +20,13 @@ except ImportError:
     def display_version():
         print(f"System Magazynowo-Sprzedażowy v{APP_VERSION}")
 
+try:
+    import config
+    if hasattr(config, "PLATFORMS"):
+        PLATFORMS = config.PLATFORMS
+except ImportError:
+    pass
+
 # ================== STYL ==================
 RED_WHITE_QSS = """
 QWidget {
