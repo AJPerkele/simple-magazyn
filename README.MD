@@ -2,9 +2,9 @@
 
 System Magazynowo-Sprzedażowy to aplikacja desktopowa wspierająca zarządzanie sprzedażą i magazynem w małej działalności (np. nierejestrowanej).
 
-![Dashboard z opcją Motyw dzienny](screenshots/dashboard-rano.jpg)
-
 ### 📦 1. Zarządzanie magazynem
+
+![magazyn](screenshots/magazyn.jpg)
 
 Program pozwala:
 
@@ -53,6 +53,9 @@ System stosuje metodę **FIFO (First In, First Out)**:
 ---
 
 ### 📊 5. Dashboard i statystyki
+
+![Dashboard z opcją Motyw dzienny](screenshots/dashboard-rano.jpg)
+![Dashboard z opcją Motyw nocny](screenshots/dashboard-noc.jpg)
 
 Wbudowany panel pokazuje:
 
