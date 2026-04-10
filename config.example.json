@@ -1,0 +1,12 @@
+{
+  "database_path": "data.db",
+  "invoice_counter": 1,
+  "invoice_prefix": "R",
+  "save_pdf": true,
+  "theme": "day",
+  "business_info": {
+    "name": "",
+    "address": "",
+    "nip": ""
+  }
+}
