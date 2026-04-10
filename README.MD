@@ -1,6 +1,8 @@
 ## 🧠 Co robi program?
 
 System Magazynowo-Sprzedażowy to aplikacja desktopowa wspierająca zarządzanie sprzedażą i magazynem w małej działalności (np. nierejestrowanej).
+![Dashboard z opcją Motyw dzienny](screenshots
+/dashboard-rano.jpg)
 
 ### 📦 1. Zarządzanie magazynem
 
