@@ -16,6 +16,8 @@ Program pozwala:
 
 ### 🧾 2. Rejestr zakupów
 
+![zakup](screenshots/zakup.jpg)
+
 Możesz wprowadzać zakupy towarów:
 
 * dodawać wiele produktów w jednym zamówieniu
@@ -27,6 +29,8 @@ Zakupy zwiększają stan magazynu i tworzą historię (FIFO).
 ---
 
 ### 💰 3. Rejestr sprzedaży
+
+![sprzedaz](screenshots/sprzedaz.jpg)
 
 Program umożliwia:
 
