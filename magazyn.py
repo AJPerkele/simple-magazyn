@@ -1406,7 +1406,7 @@ class ProductDialog(QDialog):
 class PurchaseDialog(QDialog):
     def __init__(self, db, parent=None):
         super().__init__(parent)
-        self.db = db; self.setWindowTitle("Nowy zakup"); self.resize(560,420)
+        self.db = db; self.setWindowTitle("Nowy zakup"); self.resize(620,480)
         v = QVBoxLayout(self); v.setSpacing(10)
         v.addWidget(QLabel("📦  Rejestruj zakup", styleSheet=f"font-size:15px;font-weight:700;color:{T()['text']};"))
         v.addWidget(Separator(self))
@@ -1418,7 +1418,10 @@ class PurchaseDialog(QDialog):
         self.items_tbl = SortableTable(0,2)
         self.items_tbl.setHorizontalHeaderLabels(["Produkt","Ilość"])
         self.items_tbl.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch)
-        self.items_tbl.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeToContents)
+        self.items_tbl.horizontalHeader().setSectionResizeMode(1,QHeaderView.Fixed)
+        self.items_tbl.horizontalHeader().resizeSection(1, 100)
+        self.items_tbl.verticalHeader().setDefaultSectionSize(40)
+        self.items_tbl.setMinimumHeight(120)
         v.addWidget(self.items_tbl)
         add_btn = btn("➕ Dodaj pozycję","secondary"); add_btn.clicked.connect(self._add_row); v.addWidget(add_btn)
         v.addWidget(Separator(self))
@@ -1431,8 +1434,13 @@ class PurchaseDialog(QDialog):
 
     def _add_row(self):
         r = self.items_tbl.rowCount(); self.items_tbl.insertRow(r)
-        self.items_tbl.setCellWidget(r,0,product_combo(self.db))
-        qty = QSpinBox(); qty.setRange(1,999999); self.items_tbl.setCellWidget(r,1,qty)
+        self.items_tbl.setRowHeight(r, 40)
+        combo = product_combo(self.db)
+        combo.setMinimumHeight(34)
+        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.items_tbl.setCellWidget(r,0,combo)
+        qty = QSpinBox(); qty.setRange(1,999999); qty.setMinimumHeight(34)
+        self.items_tbl.setCellWidget(r,1,qty)
 
     def _save(self):
         items = [(self.items_tbl.cellWidget(r,0).currentData(), self.items_tbl.cellWidget(r,1).value())
@@ -1448,7 +1456,7 @@ class SaleDialog(QDialog):
     def __init__(self, db, config, parent=None):
         super().__init__(parent)
         self.db = db; self.config = config
-        self.setWindowTitle("Nowa sprzedaż"); self.resize(620,560)
+        self.setWindowTitle("Nowa sprzedaż"); self.resize(680,620)
         self._fifo = 0.0
         self._build()
 
@@ -1488,7 +1496,10 @@ class SaleDialog(QDialog):
         v.addWidget(QLabel("Pozycje sprzedaży", styleSheet=f"color:{T()['text3']};font-size:11px;font-weight:600;"))
         self.items_tbl = SortableTable(0,2); self.items_tbl.setHorizontalHeaderLabels(["Produkt","Ilość"])
         self.items_tbl.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch)
-        self.items_tbl.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeToContents)
+        self.items_tbl.horizontalHeader().setSectionResizeMode(1,QHeaderView.Fixed)
+        self.items_tbl.horizontalHeader().resizeSection(1, 100)
+        self.items_tbl.verticalHeader().setDefaultSectionSize(40)
+        self.items_tbl.setMinimumHeight(120)
         v.addWidget(self.items_tbl)
         add_btn = btn("➕ Dodaj pozycję","secondary"); add_btn.clicked.connect(self._add_row); v.addWidget(add_btn)
         v.addWidget(Separator(self))
@@ -1525,9 +1536,12 @@ class SaleDialog(QDialog):
 
     def _add_row(self):
         r = self.items_tbl.rowCount(); self.items_tbl.insertRow(r)
+        self.items_tbl.setRowHeight(r, 40)
         combo = product_combo(self.db); combo.currentIndexChanged.connect(self._update_fifo)
+        combo.setMinimumHeight(34)
+        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.items_tbl.setCellWidget(r,0,combo)
-        qty = QSpinBox(); qty.setRange(1,999999); qty.valueChanged.connect(self._update_fifo)
+        qty = QSpinBox(); qty.setRange(1,999999); qty.setMinimumHeight(34); qty.valueChanged.connect(self._update_fifo)
         self.items_tbl.setCellWidget(r,1,qty)
         QTimer.singleShot(100,self._update_fifo)
 
